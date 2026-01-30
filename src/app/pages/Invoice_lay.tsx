@@ -20,39 +20,44 @@ export default function JobCardModal({
   if (!showJobModal || !selectedInvoice) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="mx-4 w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-gray-200 bg-white p-6 shadow-xl">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold text-gray-900">Apply for Job Card</h2>
-          <button
-            onClick={onClose}
-            className="rounded-lg p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50"
-          >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="w-full max-w-4xl max-h-[95vh] overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-xl">
+        {/* Header */}
+        <div className="sticky top-0 bg-white border-b border-gray-200 p-4 sm:p-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Apply for Job Card</h2>
+            <button
+              onClick={onClose}
+              className="rounded-lg p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
-        <div className="space-y-4">
+        {/* Content */}
+        <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+          {/* Invoice Details */}
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-            <h3 className="font-medium text-gray-900 mb-2">Invoice Details</h3>
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <h3 className="font-medium text-gray-900 mb-3 sm:mb-4">Invoice Details</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
               <div>
-                <p className="text-gray-500">Invoice Number</p>
-                <p className="font-medium text-gray-900">{selectedInvoice.invoice_number}</p>
+                <p className="text-gray-500 text-xs sm:text-sm">Invoice Number</p>
+                <p className="font-medium text-gray-900 text-sm sm:text-base">{selectedInvoice.invoice_number}</p>
               </div>
               <div>
-                <p className="text-gray-500">Customer</p>
-                <p className="font-medium text-gray-900">{selectedInvoice.customer_name}</p>
+                <p className="text-gray-500 text-xs sm:text-sm">Customer</p>
+                <p className="font-medium text-gray-900 text-sm sm:text-base">{selectedInvoice.customer_name}</p>
               </div>
               <div>
-                <p className="text-gray-500">Total Amount</p>
-                <p className="font-medium text-gray-900">{formatCurrency(selectedInvoice.total, selectedInvoice.currency_code)}</p>
+                <p className="text-gray-500 text-xs sm:text-sm">Total Amount</p>
+                <p className="font-medium text-gray-900 text-sm sm:text-base">{formatCurrency(selectedInvoice.total, selectedInvoice.currency_code)}</p>
               </div>
               <div>
-                <p className="text-gray-500">Status</p>
-                <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold uppercase ${getStatusColor(selectedInvoice.status)}`}>
+                <p className="text-gray-500 text-xs sm:text-sm">Status</p>
+                <span className={`inline-flex rounded-full border px-2 sm:px-3 py-1 text-xs font-semibold uppercase ${getStatusColor(selectedInvoice.status)}`}>
                   {selectedInvoice.status}
                 </span>
               </div>
@@ -66,7 +71,7 @@ export default function JobCardModal({
               <textarea
                 required
                 rows={3}
-                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 placeholder-gray-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 sm:px-4 py-2 sm:py-3 text-sm text-gray-900 placeholder-gray-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
                 placeholder="Describe the work performed, materials used, and any important details about this job..."
               />
             </div>
@@ -74,7 +79,7 @@ export default function JobCardModal({
 
           {/* Work Logs Section */}
           <div className="rounded-lg border border-gray-200 bg-white p-4">
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 sm:mb-4 gap-2">
               <h3 className="font-medium text-gray-900">Work Logs & Time Tracking</h3>
               <button
                 type="button"
@@ -85,12 +90,25 @@ export default function JobCardModal({
             </div>
             
             <div className="space-y-3">
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Date</label>
                   <input
                     type="date"
-                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-orange-500 focus:outline-none"
+                    value={new Date().toISOString().split('T')[0]}
+                    readOnly
+                    className="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-600 cursor-not-allowed"
+                    title="Current date (auto-generated)"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Time</label>
+                  <input
+                    type="time"
+                    value={new Date().toTimeString().slice(0, 5)}
+                    readOnly
+                    className="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-600 cursor-not-allowed"
+                    title="Current time (auto-generated)"
                   />
                 </div>
                 <div>
@@ -128,16 +146,16 @@ export default function JobCardModal({
 
           {/* Document Upload Section */}
           <div className="rounded-lg border border-gray-200 bg-white p-4">
-            <h3 className="font-medium text-gray-900 mb-3">Documents & Photos</h3>
+            <h3 className="font-medium text-gray-900 mb-3 sm:mb-4">Documents & Photos</h3>
             
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {/* Photo Upload */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Upload Photos
                 </label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-orange-400 transition-colors">
-                  <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 sm:p-6 text-center hover:border-orange-400 transition-colors">
+                  <svg className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                   <p className="mt-2 text-sm text-gray-600">
@@ -179,12 +197,12 @@ export default function JobCardModal({
 
           {/* Voice Recording Section */}
           <div className="rounded-lg border border-gray-200 bg-white p-4">
-            <h3 className="font-medium text-gray-900 mb-3">Voice Recording</h3>
+            <h3 className="font-medium text-gray-900 mb-3 sm:mb-4">Voice Recording</h3>
             
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
               <button
                 type="button"
-                className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors w-full sm:w-auto"
               >
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
@@ -192,7 +210,7 @@ export default function JobCardModal({
                 Start Recording
               </button>
               
-              <div className="flex-1">
+              <div className="flex-1 w-full">
                 <div className="bg-gray-100 rounded-lg h-2">
                   <div className="bg-red-500 h-2 rounded-lg" style={{width: '0%'}}></div>
                 </div>
@@ -205,16 +223,61 @@ export default function JobCardModal({
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">
-              Your Email <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="email"
-              required
-              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 placeholder-gray-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-              placeholder="john@example.com"
-            />
+          {/* Contact and Status */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-2">
+                Your Email <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="email"
+                required
+                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 placeholder-gray-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                placeholder="john@example.com"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-2">
+                Who Did the Job <span className="text-red-500">*</span>
+              </label>
+              <select
+                required
+                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+              >
+                <option value="">Select person...</option>
+                <option value="john.smith">John Smith - john.smith@example.com</option>
+                <option value="sarah.johnson">Sarah Johnson - sarah.johnson@example.com</option>
+                <option value="mike.wilson">Mike Wilson - mike.wilson@example.com</option>
+                <option value="emily.davis">Emily Davis - emily.davis@example.com</option>
+                <option value="robert.brown">Robert Brown - robert.brown@example.com</option>
+                <option value="lisa.martinez">Lisa Martinez - lisa.martinez@example.com</option>
+                <option value="david.lee">David Lee - david.lee@example.com</option>
+                <option value="jennifer.white">Jennifer White - jennifer.white@example.com</option>
+                <option value="chris.taylor">Chris Taylor - chris.taylor@example.com</option>
+                <option value="amanda.anderson">Amanda Anderson - amanda.anderson@example.com</option>
+              </select>
+              <div className="mt-2 flex flex-wrap gap-1">
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                  <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-1 9a1 1 0 112 0 1 1 0 01-2 0z"/>
+                  </svg>
+                  Team Lead
+                </span>
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                  <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
+                  </svg>
+                  Certified
+                </span>
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+                  <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462a1 1 0 00.95-.69l1.07-3.292a1 1 0 00-.1-1.371c-.3-.921-1.603-.921-1.902 0L9.049 2.927zM9.05 6.925a1 1 0 000 2l1.07 3.292a1 1 0 00.95.69h3.462a1 1 0 00.95-.69L11.05 9.25a1 1 0 00-.1-1.371c-.3-.921-1.603-.921-1.902 0L9.05 6.925z"/>
+                  </svg>
+                  Senior
+                </span>
+              </div>
+            </div>
           </div>
 
           <div>
@@ -250,7 +313,7 @@ export default function JobCardModal({
 
           <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
             <div className="flex items-start gap-3">
-              <svg className="h-5 w-5 text-orange-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-5 w-5 text-orange-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <div className="text-sm">
@@ -262,14 +325,15 @@ export default function JobCardModal({
             </div>
           </div>
 
-          <div className="flex gap-3 pt-4">
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row gap-3 pt-4 sticky bottom-0 bg-white border-t border-gray-200">
             <button
               onClick={onClose}
-              className="flex-1 rounded-lg border border-gray-300 bg-white px-6 py-3 font-medium text-gray-700 transition-all hover:bg-gray-50"
+              className="flex-1 rounded-lg border border-gray-300 bg-white px-6 py-3 font-medium text-gray-700 transition-all hover:bg-gray-50 order-2 sm:order-1"
             >
               Cancel
             </button>
-            <button className="flex-1 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-3 font-medium text-white transition-all hover:from-orange-600 hover:to-orange-700 hover:shadow-lg hover:shadow-orange-500/30">
+            <button className="flex-1 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-3 font-medium text-white transition-all hover:from-orange-600 hover:to-orange-700 hover:shadow-lg hover:shadow-orange-500/30 order-1 sm:order-2">
               Send Email Notification
             </button>
           </div>

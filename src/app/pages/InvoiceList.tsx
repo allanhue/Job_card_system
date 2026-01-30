@@ -118,6 +118,30 @@ export default function InvoiceList() {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
 
+  if (loading)
+    return (
+      <div className="min-h-screen bg-[var(--background)] px-3 py-4 sm:px-4 sm:py-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-24 sm:h-28 animate-pulse rounded-lg bg-[var(--background-elevated)]" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+
+  if (error)
+    return (
+      <div className="min-h-screen bg-[var(--background)] px-3 py-4 sm:px-4 sm:py-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            Error: {error}
+          </div>
+        </div>
+      </div>
+    );
+
   return (
     <div className="min-h-screen bg-[var(--background)] px-4 py-8 sm:px-6 lg:px-8 text-[var(--foreground)]">
       <div className="mx-auto max-w-7xl space-y-6">

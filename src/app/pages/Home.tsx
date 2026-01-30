@@ -63,35 +63,37 @@ export default function Home() {
     icon: React.ReactNode;
     color: string;
   }) => (
-    <div className="group relative overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--background-card)] p-4 transition-all hover:border-[var(--accent-primary)]/50 hover:shadow-md hover:shadow-[var(--accent-primary)]/10">
+    <div className="group relative overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--background-card)] p-3 transition-all hover:border-[var(--accent-primary)]/50 hover:shadow-sm hover:shadow-[var(--accent-primary)]/10">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs font-medium text-[var(--foreground-muted)]">{title}</p>
-          <p className="mt-1 text-xl font-semibold text-[var(--foreground)]">{value}</p>
+          <p className="mt-1 text-lg font-semibold text-[var(--foreground)]">{value}</p>
           {change && <p className="mt-1 text-xs text-[var(--foreground-muted)]">{change}</p>}
         </div>
-        <div className={`rounded-lg bg-gradient-to-br ${color} p-2 text-white`}>{icon}</div>
+        <div className={`rounded-md bg-gradient-to-br ${color} p-1.5 text-white`}>{icon}</div>
       </div>
-      <div className="absolute bottom-0 left-0 h-1 w-full bg-gradient-to-r from-[var(--accent-primary)] to-[var(--accent-secondary)] opacity-0 transition-opacity group-hover:opacity-100" />
+      <div className="absolute bottom-0 left-0 h-0.5 w-full bg-gradient-to-r from-[var(--accent-primary)] to-[var(--accent-secondary)] opacity-0 transition-opacity group-hover:opacity-100" />
     </div>
   );
 
   const StatusChart = () => {
     if (!analytics) return null;
-    const statuses = Object.entries(analytics.status_breakdown);
+
+    // Filter out draft invoices and only show paid invoices
+    const statuses = Object.entries(analytics.status_breakdown).filter(([status]) => status !== 'draft');
     const total = statuses.reduce((sum, [, count]) => sum + count, 0);
+
     const color = {
       paid: "from-green-500 to-emerald-600",
       overdue: "from-red-500 to-rose-600",
       sent: "from-blue-500 to-indigo-600",
-      draft: "from-gray-500 to-slate-600",
       default: "from-purple-500 to-violet-600",
     };
 
     return (
       <div className="rounded-lg border border-[var(--border-color)] bg-[var(--background-card)] p-5">
         <h3 className="mb-4 text-base font-semibold text-[var(--foreground)]">
-          Invoice Status Overview
+          Invoice Status Overview (Excluding Drafts)
         </h3>
         <div className="space-y-3">
           {statuses.map(([status, count]) => {
@@ -216,18 +218,18 @@ export default function Home() {
   if (!analytics) return null;
 
   return (
-    <div className="min-h-screen bg-[var(--background)] px-4 py-8">
-      <div className="mx-auto max-w-7xl space-y-6">
+    <div className="min-h-screen bg-[var(--background)] px-3 py-4 sm:px-4 sm:py-6 lg:px-8">
+      <div className="mx-auto max-w-7xl space-y-4 sm:space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-semibold text-[var(--foreground)]">Dashboard</h1>
-          <p className="mt-1 text-sm text-[var(--foreground-muted)]">
+          <h1 className="text-xl sm:text-2xl font-semibold text-[var(--foreground)]">Dashboard</h1>
+          <p className="mt-1 text-xs sm:text-sm text-[var(--foreground-muted)]">
             Overview of your job cards and invoices
           </p>
         </div>
 
         {/* Stats */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
           <StatCard
             title="Total Revenue"
             value={formatCurrency(analytics.total_revenue)}
@@ -264,7 +266,120 @@ export default function Home() {
           <RecentInvoices />
         </div>
 
-     
+        {/* Activity Logs */}
+        <div className="rounded-lg border border-[var(--border-color)] bg-[var(--background-card)] p-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 sm:mb-4 gap-2">
+            <h3 className="text-sm sm:text-base font-semibold text-[var(--foreground)]">Job Card Activity Logs</h3>
+            <Link 
+              href="/invoices?view=activity"
+              className="text-xs sm:text-sm font-medium text-[var(--accent-primary)] hover:text-[var(--accent-secondary)]"
+            >
+              View All Activity →
+            </Link>
+          </div>
+          <div className="space-y-2 sm:space-y-3">
+            {/* Sample activity logs - in real app, this would come from API */}
+            <div className="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg bg-[var(--background-elevated)]">
+              <div className="flex-shrink-0 w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-green-100 flex items-center justify-center">
+                <svg className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <p className="text-xs sm:text-sm font-medium text-[var(--foreground)] truncate">Job Completed</p>
+                  <p className="text-xs text-[var(--foreground-muted)]">2 hours ago</p>
+                </div>
+                <p className="text-xs text-[var(--foreground-muted)] mt-1">
+                  <span className="font-medium">John Smith</span> completed job for invoice #INV-2024-001
+                </p>
+                <p className="text-xs text-[var(--foreground-muted)] mt-1">
+                  Status: <span className="inline-block px-1.5 py-0.5 bg-green-100 text-green-700 rounded-full text-xs">Completed</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg bg-[var(--background-elevated)]">
+              <div className="flex-shrink-0 w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                <svg className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <p className="text-xs sm:text-sm font-medium text-[var(--foreground)] truncate">Job Application Submitted</p>
+                  <p className="text-xs text-[var(--foreground-muted)]">5 hours ago</p>
+                </div>
+                <p className="text-xs text-[var(--foreground-muted)] mt-1">
+                  <span className="font-medium">Sarah Johnson</span> applied for job card for invoice #INV-2024-002
+                </p>
+                <p className="text-xs text-[var(--foreground-muted)] mt-1">
+                  Email: sarah.johnson@example.com
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg bg-[var(--background-elevated)]">
+              <div className="flex-shrink-0 w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-orange-100 flex items-center justify-center">
+                <svg className="h-3 w-3 sm:h-4 sm:w-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <p className="text-xs sm:text-sm font-medium text-[var(--foreground)] truncate">Job In Progress</p>
+                  <p className="text-xs text-[var(--foreground-muted)]">1 day ago</p>
+                </div>
+                <p className="text-xs text-[var(--foreground-muted)] mt-1">
+                  <span className="font-medium">Mike Wilson</span> started work on invoice #INV-2024-003
+                </p>
+                <p className="text-xs text-[var(--foreground-muted)] mt-1">
+                  Status: <span className="inline-block px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs">In Progress</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg bg-[var(--background-elevated)]">
+              <div className="flex-shrink-0 w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-green-100 flex items-center justify-center">
+                <svg className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <p className="text-xs sm:text-sm font-medium text-[var(--foreground)] truncate">Job Completed</p>
+                  <p className="text-xs text-[var(--foreground-muted)]">2 days ago</p>
+                </div>
+                <p className="text-xs text-[var(--foreground-muted)] mt-1">
+                  <span className="font-medium">Emily Davis</span> completed job for invoice #INV-2024-004
+                </p>
+                <p className="text-xs text-[var(--foreground-muted)] mt-1">
+                  Total hours logged: 8.5h
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg bg-[var(--background-elevated)]">
+              <div className="flex-shrink-0 w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                <svg className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <p className="text-xs sm:text-sm font-medium text-[var(--foreground)] truncate">Job Application Submitted</p>
+                  <p className="text-xs text-[var(--foreground-muted)]">3 days ago</p>
+                </div>
+                <p className="text-xs text-[var(--foreground-muted)] mt-1">
+                  <span className="font-medium">Robert Brown</span> applied for job card for invoice #INV-2024-005
+                </p>
+                <p className="text-xs text-[var(--foreground-muted)] mt-1">
+                  Status: <span className="inline-block px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs">Pending</span>
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
