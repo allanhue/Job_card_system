@@ -1,13 +1,12 @@
 "use client";
 
-import Sidebar from "./components/Apply";
-
+import InvoiceList from "./pages/InvoiceList";
 
 
 export default function Home() {
   return (
-
-
-
-    
-  );};
+    <main>
+      <InvoiceList />
+    </main>
+  );
+}
