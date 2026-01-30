@@ -1,29 +1,14 @@
-import type { Metadata } from "next";
 import "./globals.css";
-import NavBar from "./components/nav_bar";
 
-export const metadata: Metadata = {
-  title: "JobCard Pro - Invoice Management System",
-  description: "Manage invoices and job cards efficiently",
+export const metadata = {
+  title: "JobCard Pro",
+  description: "Professional Invoice and Job Card Management",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body className="antialiased">
-        <NavBar />
+      <body className="bg-[var(--background)] text-[var(--foreground)] font-[Inter]">
         {children}
       </body>
     </html>
