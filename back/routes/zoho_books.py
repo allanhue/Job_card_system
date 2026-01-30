@@ -1,10 +1,10 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-import requests
-import logging
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+import requests
+import logging
 import os
 
 # Load environment variables
@@ -25,6 +25,12 @@ class BookToken(BaseModel):
     invoice_number: Optional[str] = None
     amount: Optional[float] = None
     description: Optional[str] = None
+
+class JobCardApplication(BaseModel):
+    email: str
+    invoice_id: str
+    selected_items: List[dict]
+    notes: Optional[str] = None
 
 # Token Manager
 class TokenManager:
@@ -105,18 +111,7 @@ def get_valid_access_token() -> str:
     return get_new_access_token()
 
 def make_zoho_books_request(endpoint: str, method: str = "POST", data: dict = None, params: dict = None) -> dict:
-    """
-    Make request to Zoho Books API with automatic token refresh
-    
-    Args:
-        endpoint: API endpoint (e.g., "/books/v3/invoices")
-        method: HTTP method (GET, POST, PUT, DELETE)
-        data: Request payload
-        params: Query parameters
-    
-    Returns:
-        Response data as dict
-    """
+    """Make request to Zoho Books API with automatic token refresh"""
     access_token = get_valid_access_token()
     
     url = f"https://www.zohoapis.com{endpoint}"
@@ -163,7 +158,8 @@ def make_zoho_books_request(endpoint: str, method: str = "POST", data: dict = No
             logger.error(f"   Response: {e.response.text}")
         raise HTTPException(status_code=500, detail=f"Zoho API request failed: {str(e)}")
 
-# API Endpoints
+# ==================== EXISTING ENDPOINTS ====================
+
 @router.get("/test-token")
 def test_token_refresh():
     """Test endpoint to manually trigger token refresh"""
@@ -259,39 +255,9 @@ def health_check():
         ])
     }
 
-@router.get("/check-scopes")
-def check_token_scopes():
-    """Check what scopes/permissions the current token has"""
-    try:
-        access_token = get_valid_access_token()
-        
-        # Try to get user info to see what access we have
-        url = "https://accounts.zoho.com/oauth/v2/user/info"
-        headers = {"Authorization": f"Zoho-oauthtoken {access_token}"}
-        
-        response = requests.get(url, headers=headers, timeout=10)
-        
-        return {
-            "status": "success",
-            "user_info": response.json() if response.status_code == 200 else None,
-            "message": "Check the response to see what scopes you have. If 'scope' is missing ZohoBooks permissions, you need to regenerate your tokens."
-        }
-    except Exception as e:
-        logger.exception("Failed to check scopes")
-        return {
-            "status": "error",
-            "message": str(e),
-            "instructions": "You need to regenerate your refresh token with ZohoBooks.fullaccess.all scope"
-        }
-
 @router.get("/invoices")
 def get_invoices(status: Optional[str] = "all"):
-    """
-    Get list of invoices
-    
-    Query Parameters:
-    - status: all, sent, draft, overdue, paid, void, unpaid, partially_paid (default: all)
-    """
+    """Get list of invoices"""
     try:
         logger.info(f"Fetching invoices with status: {status}")
         
@@ -303,7 +269,6 @@ def get_invoices(status: Optional[str] = "all"):
         
         params = {"organization_id": ZOHO_CONFIG["organization_id"]}
         
-        # Add status filter if not "all"
         if status and status != "all":
             params["status"] = status
         
@@ -351,3 +316,186 @@ def get_invoice_by_id(invoice_id: str):
     except Exception as e:
         logger.exception(f"Failed to fetch invoice {invoice_id}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== NEW ENDPOINTS ====================
+
+@router.get("/analytics/overview")
+def get_analytics_overview():
+    """Get overview analytics for dashboard"""
+    try:
+        logger.info("Fetching analytics overview...")
+        
+        if not ZOHO_CONFIG.get("organization_id"):
+            raise HTTPException(status_code=400, detail="ZOHO_ORGANIZATION_ID not set")
+        
+        params = {"organization_id": ZOHO_CONFIG["organization_id"]}
+        
+        # Fetch all invoices
+        all_invoices = make_zoho_books_request(
+            endpoint="/books/v3/invoices",
+            method="GET",
+            params=params
+        )
+        
+        invoices = all_invoices.get("invoices", [])
+        
+        # Calculate analytics
+        total_invoices = len(invoices)
+        total_revenue = sum(inv.get("total", 0) for inv in invoices)
+        total_outstanding = sum(inv.get("balance", 0) for inv in invoices)
+        
+        # Status breakdown
+        status_counts = {}
+        for inv in invoices:
+            status = inv.get("status", "unknown")
+            status_counts[status] = status_counts.get(status, 0) + 1
+        
+        # Overdue invoices
+        overdue_invoices = [inv for inv in invoices if inv.get("status") == "overdue"]
+        
+        # Recent invoices (last 5)
+        recent_invoices = sorted(
+            invoices,
+            key=lambda x: x.get("date", ""),
+            reverse=True
+        )[:5]
+        
+        return {
+            "success": True,
+            "data": {
+                "total_invoices": total_invoices,
+                "total_revenue": total_revenue,
+                "total_outstanding": total_outstanding,
+                "paid_count": status_counts.get("paid", 0),
+                "unpaid_count": status_counts.get("sent", 0) + status_counts.get("unpaid", 0),
+                "overdue_count": len(overdue_invoices),
+                "status_breakdown": status_counts,
+                "recent_invoices": recent_invoices,
+                "overdue_invoices": overdue_invoices[:5]
+            }
+        }
+        
+    except Exception as e:
+        logger.exception("Failed to fetch analytics")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/invoices/due/upcoming")
+def get_upcoming_due_invoices(days: int = 7):
+    """Get invoices due within specified days"""
+    try:
+        logger.info(f"Fetching invoices due within {days} days...")
+        
+        if not ZOHO_CONFIG.get("organization_id"):
+            raise HTTPException(status_code=400, detail="ZOHO_ORGANIZATION_ID not set")
+        
+        params = {"organization_id": ZOHO_CONFIG["organization_id"]}
+        
+        result = make_zoho_books_request(
+            endpoint="/books/v3/invoices",
+            method="GET",
+            params=params
+        )
+        
+        invoices = result.get("invoices", [])
+        current_date = datetime.now().date()
+        future_date = current_date + timedelta(days=days)
+        
+        # Filter invoices due within the specified period
+        upcoming_due = []
+        for inv in invoices:
+            if inv.get("status") in ["sent", "unpaid", "partially_paid"]:
+                due_date_str = inv.get("due_date")
+                if due_date_str:
+                    due_date = datetime.strptime(due_date_str, "%Y-%m-%d").date()
+                    if current_date <= due_date <= future_date:
+                        upcoming_due.append({
+                            **inv,
+                            "days_until_due": (due_date - current_date).days
+                        })
+        
+        # Sort by due date
+        upcoming_due.sort(key=lambda x: x.get("due_date", ""))
+        
+        return {
+            "success": True,
+            "days_range": days,
+            "count": len(upcoming_due),
+            "data": upcoming_due
+        }
+        
+    except Exception as e:
+        logger.exception("Failed to fetch upcoming due invoices")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/job-cards/apply")
+def apply_job_card(application: JobCardApplication):
+    """Apply for a job card with selected invoice items"""
+    try:
+        logger.info(f"Processing job card application for invoice: {application.invoice_id}")
+        
+        if not ZOHO_CONFIG.get("organization_id"):
+            raise HTTPException(status_code=400, detail="ZOHO_ORGANIZATION_ID not set")
+        
+        # Fetch the invoice details
+        invoice_result = make_zoho_books_request(
+            endpoint=f"/books/v3/invoices/{application.invoice_id}",
+            method="GET",
+            params={"organization_id": ZOHO_CONFIG["organization_id"]}
+        )
+        
+        invoice = invoice_result.get("invoice", {})
+        
+        # Here you would typically:
+        # 1. Create a job card record in your database
+        # 2. Send notification emails
+        # 3. Update invoice with job card reference
+        
+        # For now, return the processed data
+        job_card_data = {
+            "job_card_id": f"JC-{application.invoice_id}-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+            "email": application.email,
+            "invoice_id": application.invoice_id,
+            "invoice_number": invoice.get("invoice_number"),
+            "customer_name": invoice.get("customer_name"),
+            "selected_items": application.selected_items,
+            "notes": application.notes,
+            "total_selected_amount": sum(item.get("rate", 0) * item.get("quantity", 1) for item in application.selected_items),
+            "created_at": datetime.now().isoformat(),
+            "status": "pending"
+        }
+        
+        logger.info(f"Job card created: {job_card_data['job_card_id']}")
+        
+        return {
+            "success": True,
+            "message": "Job card application submitted successfully",
+            "data": job_card_data
+        }
+        
+    except Exception as e:
+        logger.exception("Failed to process job card application")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/check-scopes")
+def check_token_scopes():
+    """Check what scopes/permissions the current token has"""
+    try:
+        access_token = get_valid_access_token()
+        
+        url = "https://accounts.zoho.com/oauth/v2/user/info"
+        headers = {"Authorization": f"Zoho-oauthtoken {access_token}"}
+        
+        response = requests.get(url, headers=headers, timeout=10)
+        
+        return {
+            "status": "success",
+            "user_info": response.json() if response.status_code == 200 else None,
+            "message": "Check the response to see what scopes you have."
+        }
+    except Exception as e:
+        logger.exception("Failed to check scopes")
+        return {
+            "status": "error",
+            "message": str(e),
+            "instructions": "You need to regenerate your refresh token with ZohoBooks.fullaccess.all scope"
+        }

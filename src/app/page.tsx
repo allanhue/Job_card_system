@@ -1,12 +1,7 @@
 "use client";
 
-import InvoiceList from "./pages/InvoiceList";
+import Home from "./pages/Home";
 
-
-export default function Home() {
-  return (
-    <main>
-      <InvoiceList />
-    </main>
-  );
+export default function Page() {
+  return <Home />;
 }
