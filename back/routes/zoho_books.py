@@ -429,7 +429,7 @@ def get_upcoming_due_invoices(days: int = 7):
 
 @router.post("/job-cards/apply")
 def apply_job_card(application: JobCardApplication):
-    """Apply for a job card with selected invoice items"""
+    #Apply for a job card with selected invoice items
     try:
         logger.info(f"Processing job card application for invoice: {application.invoice_id}")
         
@@ -445,8 +445,6 @@ def apply_job_card(application: JobCardApplication):
         
         invoice = invoice_result.get("invoice", {})
         
-        # Here you would typically:
-       
         
         # For now, return the processed data
         job_card_data = {
@@ -476,7 +474,7 @@ def apply_job_card(application: JobCardApplication):
 
 @router.get("/check-scopes")
 def check_token_scopes():
-    """Check what scopes/permissions the current token has"""
+    #Check what scopes/permissions the current token has
     try:
         access_token = get_valid_access_token()
         
@@ -497,3 +495,36 @@ def check_token_scopes():
             "message": str(e),
             "instructions": "You need to regenerate your refresh token with ZohoBooks.fullaccess.all scope"
         }
+@router.get("/analytics/activity-logs")
+def get_activity_logs():
+    #Get recent activity logs from Zoho Books
+    try:
+        logger.info("Fetching activity logs...")
+        
+        if not ZOHO_CONFIG.get("organization_id"):
+            raise HTTPException(status_code=400, detail="ZOHO_ORGANIZATION_ID not set")
+        
+        params = {
+            "organization_id": ZOHO_CONFIG["organization_id"],
+            "module": "invoices",
+            "page": 1,
+            "per_page": 20
+        }
+        
+        result = make_zoho_books_request(
+            endpoint="/books/v3/activitylogs",
+            method="GET",
+            params=params
+        )
+        
+        logs = result.get("activitylogs", [])
+        
+        return {
+            "success": True,
+            "count": len(logs),
+            "data": logs
+        }
+        
+    except Exception as e:
+        logger.exception("Failed to fetch activity logs")
+        raise HTTPException(status_code=500, detail=str(e))
