@@ -158,7 +158,7 @@ def make_zoho_books_request(endpoint: str, method: str = "POST", data: dict = No
             logger.error(f"   Response: {e.response.text}")
         raise HTTPException(status_code=500, detail=f"Zoho API request failed: {str(e)}")
 
-# ==================== EXISTING ENDPOINTS ====================
+#enpoints
 
 @router.get("/test-token")
 def test_token_refresh():
@@ -209,7 +209,7 @@ def submit_book_data(payload: BookToken):
                 detail="ZOHO_ORGANIZATION_ID not set. Use /organizations endpoint to get your org ID"
             )
         
-        # Example: Create invoice in Zoho Books
+        # Create invoice in Zoho Books
         invoice_data = {
             "customer_name": payload.customer_name,
             "invoice_number": payload.invoice_number,
@@ -317,7 +317,7 @@ def get_invoice_by_id(invoice_id: str):
         logger.exception(f"Failed to fetch invoice {invoice_id}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# ==================== NEW ENDPOINTS ====================
+#new endpoints
 
 @router.get("/analytics/overview")
 def get_analytics_overview():
@@ -446,9 +446,7 @@ def apply_job_card(application: JobCardApplication):
         invoice = invoice_result.get("invoice", {})
         
         # Here you would typically:
-        # 1. Create a job card record in your database
-        # 2. Send notification emails
-        # 3. Update invoice with job card reference
+       
         
         # For now, return the processed data
         job_card_data = {
