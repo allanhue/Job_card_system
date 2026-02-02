@@ -1,8 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
-from routes import zoho_books 
-from db import get_database_url
+from routes import zoho_books ,auth
 
 app = FastAPI(title="Job Card API")
 
@@ -23,7 +22,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(zoho_books.router)
-
+app.include_router(auth.router)
 @app.get("/")
 def root():
     return {"message": "Job Card API is running"}
