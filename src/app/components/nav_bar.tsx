@@ -1,15 +1,25 @@
 "use client";
 
+import { useAuth } from "../Utils/auth";
+
 interface NavBarProps {
   currentPage: string;
   onNavigate: (page: string) => void;
 }
 
 export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
+  const { user, logout } = useAuth();
+  
   const navItems = [
     { name: "Dashboard", key: "home" },
     { name: "Invoices", key: "invoices" },
+    { name: "Profile", key: "profile" },
   ];
+
+  const handleLogout = () => {
+    logout();
+    // The auth context will handle redirect to login
+  };
 
   return (
     <nav className="sticky top-0 z-40 w-full border-b border-[#e9ecef] bg-white/80 backdrop-blur-md shadow-sm">
@@ -58,9 +68,15 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
           </div>
 
           {/* Actions */}
-          <div className="hidden md:flex gap-2 sm:gap-3">
-            <button className="text-xs sm:text-sm rounded-lg border border-[#e9ecef] px-2 sm:px-3 py-1.5 sm:py-2 font-medium text-gray-700 transition-all hover:border-orange-500/50 hover:text-orange-600 hover:bg-gray-50">
-              Settings
+          <div className="hidden md:flex gap-2 sm:gap-3 items-center">
+            <span className="text-xs sm:text-sm text-gray-600">
+              {user?.full_name || user?.email}
+            </span>
+            <button 
+              onClick={handleLogout}
+              className="text-xs sm:text-sm rounded-lg border border-[#e9ecef] px-2 sm:px-3 py-1.5 sm:py-2 font-medium text-gray-700 transition-all hover:border-red-500/50 hover:text-red-600 hover:bg-gray-50"
+            >
+              Logout
             </button>
             <button className="text-xs sm:text-sm rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 px-2 sm:px-3 py-1.5 sm:py-2 font-medium text-white transition-all hover:from-orange-600 hover:to-orange-700 hover:shadow-md">
               Create Job
@@ -94,8 +110,14 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
               </button>
             ))}
             <div className="pt-2 border-t border-[#e9ecef]">
-              <button className="block w-full text-left px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-md">
-                Settings
+              <div className="px-3 py-2 text-sm text-gray-600">
+                {user?.full_name || user?.email}
+              </div>
+              <button 
+                onClick={handleLogout}
+                className="block w-full text-left px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-md"
+              >
+                Logout
               </button>
               <button className="block w-full text-left px-3 py-2 text-sm font-medium bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-md mt-1">
                 Create Job

@@ -5,17 +5,24 @@ import { useSearchParams } from "next/navigation";
 import JobCardModal from "./Invoice_lay";
 
 export interface Invoice {
-  invoice_id: string;
+  id: number;
   invoice_number: string;
-  customer_name: string;
-  customer_id: string;
-  date: string;
-  due_date: string;
-  total: number;
-  balance: number;
+  client_name: string;
+  client_email: string | null;
+  client_address: string | null;
+  client_phone: string | null;
+  title: string;
+  description: string | null;
+  amount: number;
+  tax_rate: number;
+  total_amount: number;
   status: string;
-  currency_code: string;
-  line_items?: LineItem[];
+  issue_date: string;
+  due_date: string | null;
+  paid_date: string | null;
+  created_by: number;
+  created_at: string;
+  updated_at: string;
 }
 
 interface LineItem {
@@ -50,11 +57,22 @@ export default function InvoiceList() {
     setError("");
 
     try {
-      const response = await fetch(`${API_URL}/zoho_books/books/invoices?status=${status}`);
+      const token = localStorage.getItem("token");
+      let url = `${API_URL}/invoices`;
+      
+      if (status !== "all") {
+        url += `?status=${status}`;
+      }
+      
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      
       if (!response.ok) throw new Error("Failed to fetch invoices");
       const result = await response.json();
-      if (result.success && result.data?.invoices) setInvoices(result.data.invoices);
-      else setInvoices([]);
+      setInvoices(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
       setInvoices([]);
@@ -66,13 +84,16 @@ export default function InvoiceList() {
   const fetchInvoiceDetails = async (invoiceId: string) => {
     setLoadingInvoiceDetails(true);
     try {
-      const response = await fetch(`${API_URL}/zoho_books/books/invoices/${invoiceId}`);
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/invoices/${invoiceId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       if (!response.ok) throw new Error("Failed to fetch invoice details");
       const result = await response.json();
-      if (result.success && result.data?.invoice) {
-        setSelectedInvoice(result.data.invoice);
-        setShowJobModal(true);
-      }
+      setSelectedInvoice(result);
+      setShowJobModal(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load invoice details");
     } finally {
@@ -81,7 +102,7 @@ export default function InvoiceList() {
   };
 
   const handleApplyJob = (invoice: Invoice) => {
-    fetchInvoiceDetails(invoice.invoice_id);
+    fetchInvoiceDetails(invoice.id.toString());
   };
 
   const getStatusColor = (status: string) => {
@@ -204,33 +225,33 @@ export default function InvoiceList() {
                 </thead>
                 <tbody>
                   {invoices.map((invoice) => {
-                    const daysUntilDue = getDaysUntilDue(invoice.due_date);
+                    const daysUntilDue = invoice.due_date ? getDaysUntilDue(invoice.due_date) : null;
                     return (
-                      <tr key={invoice.invoice_id}>
+                      <tr key={invoice.id}>
                         <td>
                           <span className="font-mono text-[var(--accent-primary)]">
                             {invoice.invoice_number}
                           </span>
                         </td>
-                        <td>{invoice.customer_name}</td>
-                        <td>{formatDate(invoice.date)}</td>
+                        <td>{invoice.client_name}</td>
+                        <td>{formatDate(invoice.issue_date)}</td>
                         <td>
                           <div>
-                            {formatDate(invoice.due_date)}{" "}
-                            {daysUntilDue >= 0 && daysUntilDue <= 7 && invoice.status !== "paid" && (
+                            {invoice.due_date && formatDate(invoice.due_date)}{" "}
+                            {daysUntilDue !== null && daysUntilDue >= 0 && daysUntilDue <= 7 && invoice.status !== "paid" && (
                               <span className="ml-1 text-xs text-[var(--accent-warning)]">
                                 ({daysUntilDue}d left)
                               </span>
                             )}
-                            {daysUntilDue < 0 && invoice.status !== "paid" && (
+                            {daysUntilDue !== null && daysUntilDue < 0 && invoice.status !== "paid" && (
                               <span className="ml-1 text-xs text-[var(--accent-danger)]">
                                 ({Math.abs(daysUntilDue)}d overdue)
                               </span>
                             )}
                           </div>
                         </td>
-                        <td>{formatCurrency(invoice.total, invoice.currency_code)}</td>
-                        <td>{formatCurrency(invoice.balance, invoice.currency_code)}</td>
+                        <td>{formatCurrency(invoice.total_amount)}</td>
+                        <td>{formatCurrency(invoice.total_amount)}</td>
                         <td>
                           <span
                             className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold uppercase ${getStatusColor(
@@ -295,7 +316,7 @@ export default function InvoiceList() {
               <span>
                 Total:{" "}
                 <strong className="text-[var(--foreground)]">
-                  {formatCurrency(invoices.reduce((sum, inv) => sum + inv.total, 0))}
+                  {formatCurrency(invoices.reduce((sum, inv) => sum + inv.total_amount, 0))}
                 </strong>
               </span>
             </div>

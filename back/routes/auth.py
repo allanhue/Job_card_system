@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from jose import jwt, JWTError
 from pydantic import BaseModel
 from db import get_db, Base, engine
-from sqlalchemy import Column, Integer, String, Boolean
+from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, Float, ForeignKey
 import os
 
 SECRET_KEY = os.getenv("JWT_SECRET", "supersecretkey")
@@ -29,6 +29,17 @@ class UserLogin(BaseModel):
     email: str
     password: str
 
+class PromoteUser(BaseModel):
+    email: str
+
+class UserProfileUpdate(BaseModel):
+    full_name: str | None = None
+    phone: str | None = None
+    address: str | None = None
+    company: str | None = None
+    website: str | None = None
+    bio: str | None = None
+
 #  User Model 
 class User(Base):
     __tablename__ = "users"
@@ -38,6 +49,57 @@ class User(Base):
     password = Column(String, nullable=False)
     full_name = Column(String, nullable=True)
     is_admin = Column(Boolean, default=False)  # Add admin rights field
+    
+    # Additional profile fields
+    phone = Column(String, nullable=True)
+    address = Column(Text, nullable=True)
+    company = Column(String, nullable=True)
+    website = Column(String, nullable=True)
+    bio = Column(Text, nullable=True)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+# Invoice Model
+class Invoice(Base):
+    __tablename__ = "invoices"
+
+    id = Column(Integer, primary_key=True, index=True)
+    invoice_number = Column(String, unique=True, index=True, nullable=False)
+    client_name = Column(String, nullable=False)
+    client_email = Column(String, nullable=True)
+    client_address = Column(Text, nullable=True)
+    client_phone = Column(String, nullable=True)
+    
+    # Invoice details
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    amount = Column(Float, nullable=False)
+    tax_rate = Column(Float, default=0.0)
+    total_amount = Column(Float, nullable=False)
+    
+    # Status and dates
+    status = Column(String, default="pending")  # pending, paid, overdue, cancelled
+    issue_date = Column(DateTime, default=datetime.utcnow)
+    due_date = Column(DateTime, nullable=True)
+    paid_date = Column(DateTime, nullable=True)
+    
+    # Relationships
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+# Invoice Item Model for line items
+class InvoiceItem(Base):
+    __tablename__ = "invoice_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=False)
+    description = Column(String, nullable=False)
+    quantity = Column(Float, default=1.0)
+    unit_price = Column(Float, nullable=False)
+    total_price = Column(Float, nullable=False)
 
 
 Base.metadata.create_all(bind=engine)
@@ -143,14 +205,62 @@ def get_current_user_info(current_user: User = Depends(get_current_user)):
 
 @router.post("/promote-to-admin")
 def promote_user_to_admin(
-    email: str, 
+    promote_data: PromoteUser,
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
-    user = db.query(User).filter(User.email == email).first()
+    user = db.query(User).filter(User.email == promote_data.email).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
     user.is_admin = True
     db.commit()
-    return {"message": f"User {email} has been promoted to admin"}
+    return {"message": f"User {promote_data.email} has been promoted to admin"}
+
+
+@router.get("/users")
+def get_all_users(current_user: User = Depends(get_current_admin_user), db: Session = Depends(get_db)):
+    users = db.query(User).all()
+    return [
+        {
+            "id": user.id,
+            "email": user.email,
+            "full_name": user.full_name,
+            "is_admin": user.is_admin
+        }
+        for user in users
+    ]
+
+
+@router.put("/profile")
+def update_profile(
+    profile_data: UserProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(User.id == current_user.id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Update user profile
+    update_data = profile_data.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(user, field, value)
+    
+    user.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(user)
+    
+    return {
+        "message": "Profile updated successfully",
+        "user": {
+            "email": user.email,
+            "full_name": user.full_name,
+            "phone": user.phone,
+            "address": user.address,
+            "company": user.company,
+            "website": user.website,
+            "bio": user.bio,
+            "is_admin": user.is_admin
+        }
+    }
