@@ -48,7 +48,14 @@ def get_password_hash(password):
     # Ensure password is not longer than 72 characters for bcrypt
     if len(password) > 72:
         password = password[:72]
-    return pwd_context.hash(password)
+    try:
+        return pwd_context.hash(password)
+    except ValueError as e:
+        if "password cannot be longer than 72 bytes" in str(e):
+            # Fallback: manually truncate and try again
+            password = password[:72]
+            return pwd_context.hash(password)
+        raise
 
 
 def verify_password(plain_password, hashed_password):
@@ -94,13 +101,13 @@ def get_current_admin_user(current_user: User = Depends(get_current_user)):
 
 #  Routes    
 @router.post("/register")
-def register(email: str, password: str, full_name: str | None = None, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == email).first()
+def register(user_data: UserRegister, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == user_data.email).first()
     if user:
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    hashed_pw = get_password_hash(password)
-    new_user = User(email=email, password=hashed_pw, full_name=full_name)
+    hashed_pw = get_password_hash(user_data.password)
+    new_user = User(email=user_data.email, password=hashed_pw, full_name=user_data.full_name)
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
@@ -108,9 +115,9 @@ def register(email: str, password: str, full_name: str | None = None, db: Sessio
 
 
 @router.post("/login")
-def login(email: str, password: str, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == email).first()
-    if not user or not verify_password(password, user.password):
+def login(user_data: UserLogin, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == user_data.email).first()
+    if not user or not verify_password(user_data.password, user.password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     token = create_access_token({"sub": user.email})
