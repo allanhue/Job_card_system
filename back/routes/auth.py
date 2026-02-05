@@ -121,6 +121,9 @@ def get_password_hash(password):
 
 
 def verify_password(plain_password, hashed_password):
+    # Ensure password is not longer than 72 characters for bcrypt
+    if len(plain_password) > 72:
+        plain_password = plain_password[:72]
     return pwd_context.verify(plain_password, hashed_password)
 
 

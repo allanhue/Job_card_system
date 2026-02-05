@@ -49,11 +49,11 @@ export default function JobCardModal({
               </div>
               <div>
                 <p className="text-gray-500 text-xs sm:text-sm">Customer</p>
-                <p className="font-medium text-gray-900 text-sm sm:text-base">{selectedInvoice.customer_name}</p>
+                <p className="font-medium text-gray-900 text-sm sm:text-base">{selectedInvoice.client_name || 'N/A'}</p>
               </div>
               <div>
                 <p className="text-gray-500 text-xs sm:text-sm">Total Amount</p>
-                <p className="font-medium text-gray-900 text-sm sm:text-base">{formatCurrency(selectedInvoice.total, selectedInvoice.currency_code)}</p>
+                <p className="font-medium text-gray-900 text-sm sm:text-base">{formatCurrency(selectedInvoice.total_amount)}</p>
               </div>
               <div>
                 <p className="text-gray-500 text-xs sm:text-sm">Status</p>

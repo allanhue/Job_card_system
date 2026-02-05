@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "./Utils/auth";
 import NavBar from "./components/nav_bar";
 import Home from "./pages/Home";
@@ -14,10 +14,10 @@ export default function Page() {
     typeof window !== "undefined" ? localStorage.getItem("page") || "home" : "home"
   );
 
-  const handleNavigate = (page: string) => {
+  const handleNavigate = useCallback((page: string) => {
     setCurrentPage(page);
     localStorage.setItem("page", page);
-  };
+  }, []);
 
   // If user is not logged in, show login page
   if (!user) {
