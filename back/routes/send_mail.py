@@ -2,22 +2,15 @@ import os
 from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, EmailStr
-from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
+import requests
 
 load_dotenv()
 
 router = APIRouter(prefix="/mail", tags=["Mail"])
 
-conf = ConnectionConfig(
-    MAIL_USERNAME=os.getenv("MAIL_USERNAME"),
-    MAIL_PASSWORD=os.getenv("MAIL_PASSWORD"),
-    MAIL_FROM=os.getenv("MAIL_FROM"),
-    MAIL_PORT=int(os.getenv("MAIL_PORT") or 587),
-    MAIL_SERVER=os.getenv("MAIL_SERVER"),
-    MAIL_STARTTLS=True,
-    MAIL_SSL_TLS=False,
-    USE_CREDENTIALS=True
-)
+BREVO_API_KEY = os.getenv("MAIL_PASSWORD") or os.getenv("BREVO_API_KEY") or os.getenv("SENDINBLUE_API_KEY")
+MAIL_FROM = os.getenv("MAIL_FROM")
+MAIL_FROM_NAME = os.getenv("MAIL_FROM_NAME", "Job Card System")
 
 class MailRequest(BaseModel):
     email: EmailStr
@@ -26,16 +19,31 @@ class MailRequest(BaseModel):
 
 
 async def send_email(recipients: list[str], subject: str, body: str):
+    if not BREVO_API_KEY:
+        raise HTTPException(status_code=500, detail="MAIL_PASSWORD (Brevo API key) not set")
+    if not MAIL_FROM:
+        raise HTTPException(status_code=500, detail="MAIL_FROM not set")
+
+    payload = {
+        "sender": {"name": MAIL_FROM_NAME, "email": MAIL_FROM},
+        "to": [{"email": r} for r in recipients],
+        "subject": subject,
+        "htmlContent": body,
+    }
+
     try:
-        message = MessageSchema(
-            subject=subject,
-            recipients=recipients,
-            body=body,
-            subtype="html"
+        response = requests.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers={
+                "api-key": BREVO_API_KEY,
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=15,
         )
-        fm = FastMail(conf)
-        await fm.send_message(message)
-    except Exception as e:
+        if response.status_code >= 400:
+            raise HTTPException(status_code=500, detail=f"Email failed: {response.text}")
+    except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=500, detail=f"Email failed: {str(e)}")
 
 
