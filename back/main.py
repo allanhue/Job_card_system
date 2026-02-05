@@ -8,15 +8,18 @@ from routes import zoho_books, auth, invoices, job_card, send_mail
 app = FastAPI(title="Job Card API")
 
 # CORS middleware
+cors_env = os.getenv("CORS", "")
+allowed_origins = [o.strip() for o in cors_env.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
+    allow_origins=allowed_origins or [
         "https://jobcardsystem-zeta.vercel.app",
         "http://localhost:3000",
         "http://localhost:3001",
     ],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
