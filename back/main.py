@@ -9,7 +9,7 @@ app = FastAPI(title="Job Card API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://jobcardsystem-zeta.vercel.app",
+        "https://jobcardsystem-ix7p5lrk3-allanhues-projects.vercel.app/",
         "http://localhost:3000",
         "http://localhost:3001",
     ],
