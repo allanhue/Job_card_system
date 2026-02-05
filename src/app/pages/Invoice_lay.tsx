@@ -390,7 +390,7 @@ export default function JobCardModal({
               disabled={submitting}
               className="flex-1 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-3 font-medium text-white transition-all hover:from-orange-600 hover:to-orange-700 hover:shadow-lg hover:shadow-orange-500/30 order-1 sm:order-2 disabled:opacity-60 flex items-center justify-center gap-2"
             >
-              {submitting && <LoadingSpinner size={16} />}
+              {submitting && <LoadingSpinner size={16} variant="light" />}
               Send Email Notification
             </button>
           </div>

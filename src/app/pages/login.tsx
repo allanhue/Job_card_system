@@ -60,7 +60,7 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 py-3 text-white font-semibold shadow hover:opacity-90 disabled:opacity-70 flex items-center justify-center gap-2"
           >
-            {loading && <LoadingSpinner size={16} />}
+            {loading && <LoadingSpinner size={16} variant="light" />}
             Login
           </button>
         </form>

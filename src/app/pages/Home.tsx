@@ -344,7 +344,7 @@ export default function Home() {
           <h3 className="text-xl font-semibold text-slate-900">Emails Sent</h3>
           <p className="mt-1 text-sm text-slate-500">Job card notifications over 14 days</p>
         </header>
-        <svg width="100%" viewBox={`0 0 ${width} ${height}`}>
+        <svg className="w-full h-48" viewBox={`0 0 ${width} ${height}`}>
           <defs>
             <linearGradient id="lineGlow" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#2563eb" stopOpacity="0.35" />
@@ -490,7 +490,7 @@ export default function Home() {
   if (!analytics) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 px-6 py-10 page-fade">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 px-4 sm:px-6 py-8 sm:py-10 page-fade">
       <div className="mx-auto max-w-7xl space-y-10">
         <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Analytics Dashboard</h1>
