@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from jose import jwt, JWTError
 from pydantic import BaseModel
 from db import get_db, Base, engine
-from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, Float, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, Float, ForeignKey, JSON
 import os
 
 SECRET_KEY = os.getenv("JWT_SECRET", "supersecretkey")
@@ -100,6 +100,23 @@ class InvoiceItem(Base):
     quantity = Column(Float, default=1.0)
     unit_price = Column(Float, nullable=False)
     total_price = Column(Float, nullable=False)
+
+class JobCard(Base):
+    __tablename__ = "job_cards"
+
+    id = Column(Integer, primary_key=True, index=True)
+    job_card_number = Column(String, unique=True, index=True, nullable=False)
+    invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=False)
+    invoice_number = Column(String, nullable=False)
+    client_name = Column(String, nullable=False)
+    email = Column(String, nullable=True)
+    status = Column(String, default="pending")
+    notes = Column(Text, nullable=True)
+    selected_items = Column(JSON, nullable=True)
+    total_selected_amount = Column(Float, default=0.0)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 Base.metadata.create_all(bind=engine)

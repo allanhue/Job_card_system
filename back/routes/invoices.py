@@ -80,6 +80,67 @@ def generate_invoice_number(db: Session) -> str:
     
     return f"INV-{year}-{month:02d}-{count + 1:04d}"
 
+@router.get("/analytics/overview")
+def get_invoice_analytics(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    invoices = db.query(Invoice).filter(Invoice.created_by == current_user.id).all()
+
+    total_invoices = len(invoices)
+    total_revenue = sum(inv.total_amount for inv in invoices)
+    total_outstanding = sum(inv.total_amount for inv in invoices if inv.status != "paid")
+
+    status_counts = {}
+    for inv in invoices:
+        status = inv.status or "unknown"
+        status_counts[status] = status_counts.get(status, 0) + 1
+
+    overdue_invoices = [inv for inv in invoices if inv.status == "overdue"]
+
+    recent_invoices = sorted(
+        invoices,
+        key=lambda x: x.issue_date or datetime.min,
+        reverse=True
+    )[:5]
+
+    return {
+        "success": True,
+        "data": {
+            "total_invoices": total_invoices,
+            "total_revenue": total_revenue,
+            "total_outstanding": total_outstanding,
+            "paid_count": status_counts.get("paid", 0),
+            "unpaid_count": status_counts.get("sent", 0) + status_counts.get("unpaid", 0) + status_counts.get("pending", 0),
+            "overdue_count": len(overdue_invoices),
+            "status_breakdown": status_counts,
+            "recent_invoices": [
+                {
+                    "id": inv.id,
+                    "invoice_number": inv.invoice_number,
+                    "client_name": inv.client_name,
+                    "status": inv.status,
+                    "total_amount": inv.total_amount,
+                    "issue_date": inv.issue_date.isoformat() if inv.issue_date else None,
+                    "due_date": inv.due_date.isoformat() if inv.due_date else None,
+                }
+                for inv in recent_invoices
+            ],
+            "overdue_invoices": [
+                {
+                    "id": inv.id,
+                    "invoice_number": inv.invoice_number,
+                    "client_name": inv.client_name,
+                    "status": inv.status,
+                    "total_amount": inv.total_amount,
+                    "issue_date": inv.issue_date.isoformat() if inv.issue_date else None,
+                    "due_date": inv.due_date.isoformat() if inv.due_date else None,
+                }
+                for inv in overdue_invoices[:5]
+            ],
+        }
+    }
+
 # Routes
 @router.post("/", response_model=InvoiceResponse)
 def create_invoice(
@@ -130,6 +191,7 @@ def create_invoice(
         db.commit()
     
     return db_invoice
+
 
 @router.get("/", response_model=list[InvoiceResponse])
 def get_invoices(

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useRef } from "react";
 import { Invoice } from "./InvoiceList";
 
 interface JobCardModalProps {
@@ -19,8 +20,69 @@ export default function JobCardModal({
 }: JobCardModalProps) {
   if (!showJobModal || !selectedInvoice) return null;
 
+  const [email, setEmail] = useState("");
+  const [jobStatus, setJobStatus] = useState("pending");
+  const [jobDescription, setJobDescription] = useState("");
+  const [additionalNotes, setAdditionalNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const toastTimer = useRef<number | null>(null);
+
+  const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
+  const showToast = (type: "success" | "error", message: string) => {
+    setToast({ type, message });
+    if (toastTimer.current) {
+      window.clearTimeout(toastTimer.current);
+    }
+    toastTimer.current = window.setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    try {
+      const token = localStorage.getItem("token");
+      const notes = [jobDescription, additionalNotes].filter(Boolean).join("\n\n");
+      const payload = {
+        email,
+        status: jobStatus || "pending",
+        notes,
+        selected_items: [],
+      };
+
+      const res = await fetch(`${API_URL}/job-cards/invoice/${selectedInvoice.id}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error("Failed to submit job card");
+      showToast("success", "Job card submitted successfully.");
+      setJobDescription("");
+      setAdditionalNotes("");
+    } catch (err) {
+      showToast("error", err instanceof Error ? err.message : "Failed to submit job card");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      {toast && (
+        <div
+          className={`fixed top-6 right-6 z-50 rounded-xl px-4 py-3 text-sm shadow-lg ${
+            toast.type === "success"
+              ? "bg-emerald-600 text-white"
+              : "bg-red-600 text-white"
+          }`}
+        >
+          {toast.message}
+        </div>
+      )}
       <div className="w-full max-w-4xl max-h-[95vh] overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-xl">
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-200 p-4 sm:p-6">
@@ -71,6 +133,8 @@ export default function JobCardModal({
               <textarea
                 required
                 rows={3}
+                value={jobDescription}
+                onChange={(e) => setJobDescription(e.target.value)}
                 className="w-full rounded-lg border border-gray-300 bg-white px-3 sm:px-4 py-2 sm:py-3 text-sm text-gray-900 placeholder-gray-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
                 placeholder="Describe the work performed, materials used, and any important details about this job..."
               />
@@ -232,6 +296,8 @@ export default function JobCardModal({
               <input
                 type="email"
                 required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 placeholder-gray-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
                 placeholder="john@example.com"
               />
@@ -286,6 +352,8 @@ export default function JobCardModal({
             </label>
             <select
               required
+              value={jobStatus}
+              onChange={(e) => setJobStatus(e.target.value)}
               className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
             >
               <option value="">Select job status...</option>
@@ -306,6 +374,8 @@ export default function JobCardModal({
             </label>
             <textarea
               rows={4}
+              value={additionalNotes}
+              onChange={(e) => setAdditionalNotes(e.target.value)}
               className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 placeholder-gray-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
               placeholder="Any additional information about the job status or requirements..."
             />
@@ -333,7 +403,14 @@ export default function JobCardModal({
             >
               Cancel
             </button>
-            <button className="flex-1 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-3 font-medium text-white transition-all hover:from-orange-600 hover:to-orange-700 hover:shadow-lg hover:shadow-orange-500/30 order-1 sm:order-2">
+            <button
+              onClick={handleSubmit}
+              disabled={submitting}
+              className="flex-1 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-3 font-medium text-white transition-all hover:from-orange-600 hover:to-orange-700 hover:shadow-lg hover:shadow-orange-500/30 order-1 sm:order-2 disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {submitting && (
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/60 border-t-transparent" />
+              )}
               Send Email Notification
             </button>
           </div>

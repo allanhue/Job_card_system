@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
-from routes import zoho_books, auth, invoices
+from routes import zoho_books, auth, invoices, job_card, send_mail
 
 app = FastAPI(title="Job Card API")
 
@@ -9,7 +9,7 @@ app = FastAPI(title="Job Card API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://jobcardsystem-ix7p5lrk3-allanhues-projects.vercel.app/",
+        "https://jobcardsystem-zeta.vercel.app",
         "http://localhost:3000",
         "http://localhost:3001",
     ],
@@ -22,6 +22,8 @@ app.add_middleware(
 app.include_router(zoho_books.router)
 app.include_router(auth.router)
 app.include_router(invoices.router)
+app.include_router(job_card.router)
+app.include_router(send_mail.router)
 
 @app.get("/")
 def root():

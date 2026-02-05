@@ -28,6 +28,7 @@ interface ActivityLog {
 
 export default function Home() {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -35,13 +36,26 @@ export default function Home() {
 
   useEffect(() => {
     fetchAnalytics();
+    fetchRecentJobCards();
+
+    const interval = setInterval(() => {
+      fetchAnalytics();
+      fetchRecentJobCards();
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const fetchAnalytics = async () => {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`${API_URL}/zoho_books/books/analytics/overview`);
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_URL}/invoices/analytics/overview`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       if (!res.ok) throw new Error("Failed to fetch analytics");
       const result = await res.json();
       if (result.success && result.data) setAnalytics(result.data);
@@ -49,6 +63,44 @@ export default function Home() {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchRecentJobCards = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_URL}/job-cards/recent?limit=6`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!res.ok) throw new Error("Failed to fetch activity logs");
+      const result = await res.json();
+      if (result.success && result.data) {
+        const logs = result.data.map((jc: any) => {
+          const status = (jc.status || "pending").toLowerCase();
+          const type =
+            status === "completed"
+              ? "completed"
+              : status === "in_progress"
+              ? "in_progress"
+              : status === "assigned"
+              ? "assigned"
+              : "application";
+          return {
+            id: String(jc.id),
+            type,
+            handler: jc.client_name || jc.email || "Unknown",
+            invoice_number: jc.invoice_number || "N/A",
+            timestamp: formatTimeAgo(jc.created_at),
+            status: jc.status,
+            email: jc.email,
+          } as ActivityLog;
+        });
+        setActivityLogs(logs);
+      }
+    } catch {
+      setActivityLogs([]);
     }
   };
 
@@ -60,58 +112,18 @@ export default function Home() {
       maximumFractionDigits: 0,
     }).format(amount);
 
-  // Mock activity data
-  const activityLogs: ActivityLog[] = [
-    {
-      id: "1",
-      type: "completed",
-      handler: "John Smith",
-      invoice_number: "INV-2024-001",
-      timestamp: "2 hours ago",
-      status: "Completed",
-      hours: 8.5,
-    },
-    {
-      id: "2",
-      type: "application",
-      handler: "Sarah Johnson",
-      invoice_number: "INV-2024-002",
-      timestamp: "5 hours ago",
-      email: "sarah.johnson@example.com",
-    },
-    {
-      id: "3",
-      type: "in_progress",
-      handler: "Mike Wilson",
-      invoice_number: "INV-2024-003",
-      timestamp: "1 day ago",
-      status: "In Progress",
-    },
-    {
-      id: "4",
-      type: "completed",
-      handler: "Emily Davis",
-      invoice_number: "INV-2024-004",
-      timestamp: "2 days ago",
-      hours: 12.0,
-    },
-    {
-      id: "5",
-      type: "application",
-      handler: "Robert Brown",
-      invoice_number: "INV-2024-005",
-      timestamp: "3 days ago",
-      status: "Pending",
-    },
-    {
-      id: "6",
-      type: "assigned",
-      handler: "Alice Cooper",
-      invoice_number: "INV-2024-006",
-      timestamp: "4 days ago",
-      status: "Assigned",
-    },
-  ];
+  const formatTimeAgo = (dateString: string) => {
+    if (!dateString) return "just now";
+    const date = new Date(dateString);
+    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+    if (seconds < 60) return "just now";
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  };
 
   // Handler distribution
   const handlerDistribution = activityLogs.reduce((acc, log) => {
@@ -255,7 +267,7 @@ export default function Home() {
           href="/invoices?view=activity"
           className="text-sm font-semibold text-blue-600 hover:text-blue-700"
         >
-          View all →
+          View all &gt;
         </Link>
       </header>
 
@@ -278,12 +290,12 @@ export default function Home() {
             >
               <span className="text-sm font-semibold">
                 {log.type === "completed"
-                  ? "✓"
+                  ? "OK"
                   : log.type === "application"
-                  ? "📝"
+                  ? "APP"
                   : log.type === "in_progress"
-                  ? "⚙️"
-                  : "👤"}
+                  ? "PROG"
+                  : "ASG"}
               </span>
             </div>
 
