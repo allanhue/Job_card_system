@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useToast } from "@/app/Utils/toast";
+import { useRouter } from "next/navigation";
 import LoadingSpinner from "@/app/components/LoadingSpinner";
 
 export default function PasswordRecovery() {
   const searchParams = useSearchParams();
   const token = searchParams?.get("token") || "";
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -50,6 +52,7 @@ export default function PasswordRecovery() {
       if (!res.ok) throw new Error("Failed to reset password");
       pushToast("success", "Password reset successful. You can log in now.");
       setPassword("");
+      setTimeout(() => router.push("/?page=login"), 1000);
     } catch (err) {
       pushToast("error", err instanceof Error ? err.message : "Failed to reset password");
     } finally {
@@ -68,7 +71,7 @@ export default function PasswordRecovery() {
         <p className="text-sm text-slate-500 text-center mb-6">
           {isReset
             ? "Enter a new password for your account."
-            : "Enter your email and we will send a reset link."}
+            : "Enter your email ."}
         </p>
 
         {!isReset ? (

@@ -9,11 +9,13 @@ from pydantic import BaseModel
 from db import get_db, Base, engine
 from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, Float, ForeignKey, JSON
 import secrets
+import logging
 import os
 
 SECRET_KEY = os.getenv("JWT_SECRET", "supersecretkey")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
+logger = logging.getLogger(__name__)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
@@ -299,10 +301,12 @@ async def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(
     )
     try:
         await send_email([user.email], subject, body)
-    except Exception:
-        pass
-
-    return {"message": "If the email exists, a reset link was sent."}
+        return {"message": "If the email exists, a reset link was sent.", "version": "forgot-password-v2"}
+    except Exception as e:
+        logger.exception("Failed to send reset email")
+        if os.getenv("DEBUG_EMAIL") == "1":
+            return {"message": "Email send failed", "error": str(e), "version": "forgot-password-v2"}
+        return {"message": "If the email exists, a reset link was sent.", "version": "forgot-password-v2"}
 
 
 @router.post("/reset-password")
