@@ -36,12 +36,20 @@ interface LineItem {
   status?: string;
 }
 
-export default function InvoiceList() {
+export default function InvoiceList({
+  initialStatus,
+  initialView,
+}: {
+  initialStatus?: string;
+  initialView?: string;
+} = {}) {
   const searchParams = useSearchParams();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [statusFilter, setStatusFilter] = useState(searchParams?.get("status") || "all");
+  const [statusFilter, setStatusFilter] = useState(
+    initialStatus || searchParams?.get("status") || "all"
+  );
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [showJobModal, setShowJobModal] = useState(false);
   const [loadingInvoiceDetails, setLoadingInvoiceDetails] = useState(false);
@@ -53,6 +61,18 @@ export default function InvoiceList() {
   useEffect(() => {
     fetchInvoices(statusFilter);
   }, [statusFilter]);
+
+  useEffect(() => {
+    if (initialStatus && initialStatus !== statusFilter) {
+      setStatusFilter(initialStatus);
+    }
+  }, [initialStatus, statusFilter]);
+
+  useEffect(() => {
+    if (initialView === "activity" && statusFilter !== "all") {
+      setStatusFilter("all");
+    }
+  }, [initialView, statusFilter]);
 
   const fetchInvoices = async (status: string) => {
     setLoading(true);

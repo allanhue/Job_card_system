@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, Suspense } from "react";
 import dynamic from "next/dynamic";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "./Utils/auth";
 import NavBar from "./components/nav_bar";
 import Login from "./pages/login";
@@ -13,17 +14,45 @@ const Profile = dynamic(() => import("./pages/Profile"), { ssr: false });
 
 export default function Page() {
   const { user } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [currentPage, setCurrentPage] = useState(
     typeof window !== "undefined" ? localStorage.getItem("page") || "home" : "home"
   );
 
-  const handleNavigate = useCallback((page: string) => {
-    setCurrentPage(page);
-    localStorage.setItem("page", page);
-  }, []);
+  const pageParam = searchParams?.get("page");
+  const statusParam = searchParams?.get("status") || "all";
+  const viewParam = searchParams?.get("view") || "";
 
-  // If user is not logged in, show login page
-  if (!user) {
+  useEffect(() => {
+    if (!pageParam) return;
+    setCurrentPage(pageParam);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("page", pageParam);
+    }
+  }, [pageParam]);
+
+  useEffect(() => {
+    if (!user) return;
+    if ((pageParam || currentPage) === "home" && !user.is_admin) {
+      setCurrentPage("invoices");
+      localStorage.setItem("page", "invoices");
+      router.push("/?page=invoices");
+    }
+  }, [user, pageParam, currentPage, router]);
+
+  const handleNavigate = useCallback(
+    (page: string) => {
+      setCurrentPage(page);
+      localStorage.setItem("page", page);
+      router.push(`/?page=${page}`);
+    },
+    [router]
+  );
+
+  const effectivePage = pageParam || currentPage;
+
+  if (!user && effectivePage !== "login") {
     return <Login />;
   }
 
@@ -39,9 +68,12 @@ export default function Page() {
             </div>
           }
         >
-          {currentPage === "home" && <Home />}
-          {currentPage === "invoices" && <InvoiceList />}
-          {currentPage === "profile" && <Profile />}
+          {effectivePage === "home" && <Home />}
+          {effectivePage === "invoices" && (
+            <InvoiceList initialStatus={statusParam} initialView={viewParam} />
+          )}
+          {effectivePage === "profile" && <Profile />}
+          {effectivePage === "login" && <Login />}
         </Suspense>
       </main>
     </>

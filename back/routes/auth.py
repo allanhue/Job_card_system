@@ -8,6 +8,7 @@ from jose import jwt, JWTError
 from pydantic import BaseModel
 from db import get_db, Base, engine
 from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, Float, ForeignKey, JSON
+import secrets
 import os
 
 SECRET_KEY = os.getenv("JWT_SECRET", "supersecretkey")
@@ -29,6 +30,13 @@ class UserLogin(BaseModel):
     email: str
     password: str
 
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
 class PromoteUser(BaseModel):
     email: str
 
@@ -48,7 +56,7 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     password = Column(String, nullable=False)
     full_name = Column(String, nullable=True)
-    is_admin = Column(Boolean, default=False)  # Add admin rights field
+    is_admin = Column(Boolean, default=False)  # Admin role flag
     
     # Additional profile fields
     phone = Column(String, nullable=True)
@@ -100,6 +108,16 @@ class InvoiceItem(Base):
     quantity = Column(Float, default=1.0)
     unit_price = Column(Float, nullable=False)
     total_price = Column(Float, nullable=False)
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    token = Column(String, unique=True, index=True, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    used_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 class ZohoInvoice(Base):
     __tablename__ = "zoho_invoices"
@@ -233,9 +251,70 @@ def login(user_data: UserLogin, db: Session = Depends(get_db)):
         "user": {
             "email": user.email, 
             "full_name": user.full_name,
-            "is_admin": user.is_admin
+            "is_admin": user.is_admin,
+            "role": "admin" if user.is_admin else "user"
         }
     }
+
+
+@router.post("/forgot-password")
+async def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == payload.email).first()
+    if not user:
+        return {"message": "If the email exists, a reset link was sent."}
+
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.utcnow() + timedelta(hours=1)
+
+    reset = PasswordResetToken(
+        user_id=user.id,
+        token=token,
+        expires_at=expires_at
+    )
+    db.add(reset)
+    db.commit()
+
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    reset_link = f"{frontend_url}/?page=reset&token={token}"
+
+    from routes.send_mail import send_email
+    subject = "Reset Your Password"
+    body = (
+        "<p>We received a request to reset your password.</p>"
+        f"<p><a href=\"{reset_link}\">Click here to reset your password</a></p>"
+        "<p>This link expires in 1 hour.</p>"
+    )
+    try:
+        await send_email([user.email], subject, body)
+    except Exception:
+        pass
+
+    return {"message": "If the email exists, a reset link was sent."}
+
+
+@router.post("/reset-password")
+def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
+    if len(payload.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+
+    token_entry = db.query(PasswordResetToken).filter(
+        PasswordResetToken.token == payload.token,
+        PasswordResetToken.used_at.is_(None),
+        PasswordResetToken.expires_at >= datetime.utcnow()
+    ).first()
+
+    if not token_entry:
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+
+    user = db.query(User).filter(User.id == token_entry.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.password = get_password_hash(payload.new_password)
+    token_entry.used_at = datetime.utcnow()
+    db.commit()
+
+    return {"message": "Password reset successful"}
 
 
 @router.get("/me")
@@ -243,7 +322,8 @@ def get_current_user_info(current_user: User = Depends(get_current_user)):
     return {
         "email": current_user.email,
         "full_name": current_user.full_name,
-        "is_admin": current_user.is_admin
+        "is_admin": current_user.is_admin,
+        "role": "admin" if current_user.is_admin else "user"
     }
 
 
