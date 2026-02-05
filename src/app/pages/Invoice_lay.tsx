@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Invoice } from "./InvoiceList";
 import { useToast } from "@/app/Utils/toast";
+import { useAuth } from "@/app/Utils/auth";
 import LoadingSpinner from "@/app/components/LoadingSpinner";
 
 interface JobCardModalProps {
@@ -34,10 +35,31 @@ export default function JobCardModal({
   const [photos, setPhotos] = useState<File[]>([]);
   const [documents, setDocuments] = useState<File[]>([]);
   const [voiceNote, setVoiceNote] = useState<File | null>(null);
+  const [users, setUsers] = useState<{ id: number; email: string; full_name?: string; role: string }[]>([]);
+  const [assignedUserId, setAssignedUserId] = useState("");
+  const [userSearch, setUserSearch] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const { pushToast } = useToast();
+  const { user } = useAuth();
 
   const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
+  const fetchUsers = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_URL}/auth/users/list`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed to load users");
+      const data = await res.json();
+      setUsers(data || []);
+      if (user?.id) {
+        setAssignedUserId(String(user.id));
+      }
+    } catch (err) {
+      pushToast("error", err instanceof Error ? err.message : "Failed to load users");
+    }
+  };
 
   const handleSubmit = async () => {
     setSubmitting(true);
@@ -85,6 +107,9 @@ export default function JobCardModal({
       formData.append("notes", notes);
       formData.append("selected_items", JSON.stringify([]));
       formData.append("work_logs", JSON.stringify(workLogs));
+      if (assignedUserId) {
+        formData.append("assigned_user_id", assignedUserId);
+      }
       photos.forEach((file) => formData.append("photos", file));
       documents.forEach((file) => formData.append("documents", file));
       if (voiceNote) formData.append("voice_note", voiceNote);
@@ -366,41 +391,52 @@ export default function JobCardModal({
               <label className="block text-sm font-medium text-gray-900 mb-2">
                 Who Did the Job <span className="text-red-500">*</span>
               </label>
+              <input
+                type="text"
+                placeholder="Search user..."
+                value={userSearch}
+                onChange={(e) => setUserSearch(e.target.value)}
+                className="mb-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-orange-500 focus:outline-none"
+              />
               <select
                 required
+                value={assignedUserId}
+                onChange={(e) => setAssignedUserId(e.target.value)}
+                onFocus={() => {
+                  if (users.length === 0) fetchUsers();
+                }}
                 className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
               >
                 <option value="">Select person...</option>
-                <option value="john.smith">John Smith - john.smith@example.com</option>
-                <option value="sarah.johnson">Sarah Johnson - sarah.johnson@example.com</option>
-                <option value="mike.wilson">Mike Wilson - mike.wilson@example.com</option>
-                <option value="emily.davis">Emily Davis - emily.davis@example.com</option>
-                <option value="robert.brown">Robert Brown - robert.brown@example.com</option>
-                <option value="lisa.martinez">Lisa Martinez - lisa.martinez@example.com</option>
-                <option value="david.lee">David Lee - david.lee@example.com</option>
-                <option value="jennifer.white">Jennifer White - jennifer.white@example.com</option>
-                <option value="chris.taylor">Chris Taylor - chris.taylor@example.com</option>
-                <option value="amanda.anderson">Amanda Anderson - amanda.anderson@example.com</option>
+                {users
+                  .filter((u) => {
+                    const q = userSearch.toLowerCase();
+                    return (
+                      u.email.toLowerCase().includes(q) ||
+                      (u.full_name || "").toLowerCase().includes(q)
+                    );
+                  })
+                  .map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {(u.full_name || u.email) + " - " + u.email}
+                  </option>
+                ))}
               </select>
               <div className="mt-2 flex flex-wrap gap-1">
-                <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-                  <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-1 9a1 1 0 112 0 1 1 0 01-2 0z"/>
-                  </svg>
-                  Team Lead
-                </span>
-                <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
-                  <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
-                  </svg>
-                  Certified
-                </span>
-                <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
-                  <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462a1 1 0 00.95-.69l1.07-3.292a1 1 0 00-.1-1.371c-.3-.921-1.603-.921-1.902 0L9.049 2.927zM9.05 6.925a1 1 0 000 2l1.07 3.292a1 1 0 00.95.69h3.462a1 1 0 00.95-.69L11.05 9.25a1 1 0 00-.1-1.371c-.3-.921-1.603-.921-1.902 0L9.05 6.925z"/>
-                  </svg>
-                  Senior
-                </span>
+                {users
+                  .filter((u) => String(u.id) === assignedUserId)
+                  .map((u) => (
+                    <span
+                      key={u.id}
+                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                        u.role === "admin"
+                          ? "bg-purple-100 text-purple-700"
+                          : "bg-blue-100 text-blue-700"
+                      }`}
+                    >
+                      {u.role === "admin" ? "Admin" : "User"}
+                    </span>
+                  ))}
               </div>
             </div>
           </div>

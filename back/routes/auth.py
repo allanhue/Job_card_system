@@ -166,6 +166,9 @@ class JobCard(Base):
     work_logs = Column(JSON, nullable=True)
     attachments = Column(JSON, nullable=True)
     voice_note_path = Column(String, nullable=True)
+    assigned_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    assigned_user_email = Column(String, nullable=True)
+    assigned_user_name = Column(String, nullable=True)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -430,6 +433,20 @@ def get_all_users(current_user: User = Depends(get_current_admin_user), db: Sess
             "email": user.email,
             "full_name": user.full_name,
             "is_admin": user.is_admin
+        }
+        for user in users
+    ]
+
+
+@router.get("/users/list")
+def get_users_list(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    users = db.query(User).all()
+    return [
+        {
+            "id": user.id,
+            "email": user.email,
+            "full_name": user.full_name,
+            "role": "admin" if user.is_admin else "user",
         }
         for user in users
     ]

@@ -21,7 +21,7 @@ export default function LoginPage() {
     try {
       setLoading(true);
       setError("");
-      const user = await login(email, password);
+      const user: any = await login(email, password);
       pushToast("success", "Login successful. Redirecting...");
       setShowOverlay(true);
       const target = user?.is_admin ? "/?page=home" : "/?page=invoices";

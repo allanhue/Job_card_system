@@ -111,7 +111,12 @@ export default function Home() {
           return {
             id: String(jc.id),
             type,
-            handler: jc.client_name || jc.email || "Unknown",
+            handler:
+              jc.assigned_user_name ||
+              jc.assigned_user_email ||
+              jc.client_name ||
+              jc.email ||
+              "Unknown",
             invoice_number: jc.invoice_number || "N/A",
             timestamp: formatTimeAgo(jc.created_at),
             status: jc.status,
@@ -555,8 +560,8 @@ export default function Home() {
   if (!analytics) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 px-4 sm:px-6 py-8 sm:py-10 page-fade">
-      <div className="mx-auto max-w-7xl space-y-10">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 px-3 sm:px-6 py-6 sm:py-10 page-fade">
+      <div className="mx-auto max-w-7xl space-y-8">
         <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Analytics Dashboard</h1>
@@ -591,55 +596,77 @@ export default function Home() {
 
         <OverdueAlert />
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <EmailLineChart />
           <InvoiceStatusBar />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <JobStatusBar />
           <PieChart />
         </div>
 
         {user?.is_admin && viewMode === "detailed" && jobCardStats && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <HoursLineChart />
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-md">
-              <h3 className="text-lg font-semibold text-slate-900 mb-4">Key Totals</h3>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div className="rounded-lg bg-slate-50 p-3">
-                  <p className="text-slate-500">Total Job Cards</p>
-                  <p className="text-xl font-semibold text-slate-900">{jobCardStats.total_jobs ?? 0}</p>
-                </div>
-                <div className="rounded-lg bg-slate-50 p-3">
-                  <p className="text-slate-500">Total Hours</p>
-                  <p className="text-xl font-semibold text-slate-900">{jobCardStats.total_hours ?? 0}</p>
-                </div>
-                <div className="rounded-lg bg-slate-50 p-3">
-                  <p className="text-slate-500">Attachments</p>
-                  <p className="text-xl font-semibold text-slate-900">{jobCardStats.total_attachments ?? 0}</p>
-                </div>
-                <div className="rounded-lg bg-slate-50 p-3">
-                  <p className="text-slate-500">Overdue Invoices</p>
-                  <p className="text-xl font-semibold text-slate-900">{analytics?.overdue_count ?? 0}</p>
-                </div>
-              </div>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-md">
-              <h3 className="text-lg font-semibold text-slate-900 mb-4">Top Customers</h3>
-              <div className="space-y-3 text-sm">
-                {(jobCardStats.top_customers || []).map((c) => (
-                  <div key={c.name} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                    <span className="text-slate-700">{c.name}</span>
-                    <span className="text-slate-900 font-semibold">{c.count}</span>
+          <>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <HoursLineChart />
+              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-md">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">Key Totals</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="rounded-lg bg-slate-50 p-3">
+                    <p className="text-slate-500">Total Job Cards</p>
+                    <p className="text-xl font-semibold text-slate-900">{jobCardStats.total_jobs ?? 0}</p>
                   </div>
-                ))}
-                {(!jobCardStats.top_customers || jobCardStats.top_customers.length === 0) && (
-                  <p className="text-slate-500">No customer data yet.</p>
-                )}
+                  <div className="rounded-lg bg-slate-50 p-3">
+                    <p className="text-slate-500">Total Hours</p>
+                    <p className="text-xl font-semibold text-slate-900">{jobCardStats.total_hours ?? 0}</p>
+                  </div>
+                  <div className="rounded-lg bg-slate-50 p-3">
+                    <p className="text-slate-500">Attachments</p>
+                    <p className="text-xl font-semibold text-slate-900">{jobCardStats.total_attachments ?? 0}</p>
+                  </div>
+                  <div className="rounded-lg bg-slate-50 p-3">
+                    <p className="text-slate-500">Overdue Invoices</p>
+                    <p className="text-xl font-semibold text-slate-900">{analytics?.overdue_count ?? 0}</p>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-md">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">Jobs By Customer</h3>
+                <div className="space-y-3 text-sm">
+                  {(jobCardStats.top_customers || []).map((c) => (
+                    <div key={c.name} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                      <span className="text-slate-700">{c.name}</span>
+                      <span className="text-slate-900 font-semibold">{c.count}</span>
+                    </div>
+                  ))}
+                  {(!jobCardStats.top_customers || jobCardStats.top_customers.length === 0) && (
+                    <p className="text-slate-500">No customer data yet.</p>
+                  )}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-md">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">Recent Uploads</h3>
+                <div className="space-y-3 text-sm">
+                  {activityLogs
+                    .filter((log) => log.type === "application")
+                    .slice(0, 6)
+                    .map((log) => (
+                      <div key={log.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                        <span className="text-slate-700">{log.invoice_number}</span>
+                        <span className="text-slate-500">{log.timestamp}</span>
+                      </div>
+                    ))}
+                  {activityLogs.length === 0 && (
+                    <p className="text-slate-500">No uploads yet.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </>
         )}
 
         <ActivityLogs />

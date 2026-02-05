@@ -34,6 +34,9 @@ class JobCardResponse(BaseModel):
     work_logs: list[dict] | None = None
     attachments: list[dict] | None = None
     voice_note_path: str | None = None
+    assigned_user_id: int | None = None
+    assigned_user_email: str | None = None
+    assigned_user_name: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -111,6 +114,7 @@ async def create_job_card(
     selected_items: str | None = Form(None),
     work_logs: str | None = Form(None),
     notify_email: bool | None = Form(True),
+    assigned_user_id: str | None = Form(None),
     photos: list[UploadFile] = File(default_factory=list),
     documents: list[UploadFile] = File(default_factory=list),
     voice_note: UploadFile | None = File(None),
@@ -168,6 +172,13 @@ async def create_job_card(
         if voice_saved:
             voice_path = voice_saved[0]["path"]
 
+    assigned_user = None
+    if assigned_user_id:
+        try:
+            assigned_user = db.query(User).filter(User.id == int(assigned_user_id)).first()
+        except Exception:
+            assigned_user = None
+
     job_card = JobCard(
         job_card_number=job_card_number,
         invoice_id=invoice.id if invoice else zoho_invoice.id,
@@ -181,6 +192,9 @@ async def create_job_card(
         work_logs=work_logs_parsed,
         attachments=attachments,
         voice_note_path=voice_path,
+        assigned_user_id=assigned_user.id if assigned_user else None,
+        assigned_user_email=assigned_user.email if assigned_user else None,
+        assigned_user_name=assigned_user.full_name if assigned_user else None,
         created_by=current_user.id,
     )
 
@@ -242,6 +256,9 @@ def get_recent_job_cards(
                 "work_logs": jc.work_logs or [],
                 "attachments": jc.attachments or [],
                 "voice_note_path": jc.voice_note_path,
+                "assigned_user_id": jc.assigned_user_id,
+                "assigned_user_email": jc.assigned_user_email,
+                "assigned_user_name": jc.assigned_user_name,
                 "created_at": jc.created_at.isoformat() if jc.created_at else None,
             }
             for jc in job_cards

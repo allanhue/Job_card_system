@@ -14,6 +14,21 @@ const InvoiceList = dynamic(() => import("./pages/InvoiceList"), { ssr: false })
 const Profile = dynamic(() => import("./pages/Profile"), { ssr: false });
 
 export default function Page() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600 gap-3">
+          <LoadingSpinner size={28} />
+          Loading...
+        </div>
+      }
+    >
+      <PageContent />
+    </Suspense>
+  );
+}
+
+function PageContent() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -70,23 +85,14 @@ export default function Page() {
     <>
       {user && <NavBar currentPage={currentPage} onNavigate={handleNavigate} />}
       <main className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
-        <Suspense
-          fallback={
-            <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600 gap-3">
-              <LoadingSpinner size={28} />
-              Loading...
-            </div>
-          }
-        >
-          {effectivePage === "home" && <Home />}
-          {effectivePage === "invoices" && (
-            <InvoiceList initialStatus={statusParam} initialView={viewParam} />
-          )}
-          {effectivePage === "profile" && <Profile />}
-          {effectivePage === "login" && <Login />}
-          {effectivePage === "forgot" && <PasswordRecovery />}
-          {effectivePage === "reset" && <PasswordRecovery />}
-        </Suspense>
+        {effectivePage === "home" && <Home />}
+        {effectivePage === "invoices" && (
+          <InvoiceList initialStatus={statusParam} initialView={viewParam} />
+        )}
+        {effectivePage === "profile" && <Profile />}
+        {effectivePage === "login" && <Login />}
+        {effectivePage === "forgot" && <PasswordRecovery />}
+        {effectivePage === "reset" && <PasswordRecovery />}
       </main>
     </>
   );
