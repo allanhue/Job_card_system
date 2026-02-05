@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 from pydantic import BaseModel
 from db import get_db
-from routes.auth import get_current_user, User, Invoice, InvoiceItem
+from routes.auth import get_current_user, User, Invoice, InvoiceItem, ZohoInvoice
 
 security = HTTPBearer()
 
@@ -86,20 +86,31 @@ def get_invoice_analytics(
     db: Session = Depends(get_db)
 ):
     invoices = db.query(Invoice).filter(Invoice.created_by == current_user.id).all()
+    zoho_invoices = db.query(ZohoInvoice).filter(
+        (ZohoInvoice.created_by == current_user.id) | (ZohoInvoice.created_by.is_(None))
+    ).all()
 
-    total_invoices = len(invoices)
-    total_revenue = sum(inv.total_amount for inv in invoices)
-    total_outstanding = sum(inv.total_amount for inv in invoices if inv.status != "paid")
+    combined = []
+    combined.extend(invoices)
+    combined.extend(zoho_invoices)
+
+    total_invoices = len(combined)
+    total_revenue = sum(inv.total_amount for inv in combined)
+    total_outstanding = sum(
+        (inv.balance if hasattr(inv, "balance") and inv.balance is not None else inv.total_amount)
+        for inv in combined
+        if inv.status != "paid"
+    )
 
     status_counts = {}
-    for inv in invoices:
+    for inv in combined:
         status = inv.status or "unknown"
         status_counts[status] = status_counts.get(status, 0) + 1
 
-    overdue_invoices = [inv for inv in invoices if inv.status == "overdue"]
+    overdue_invoices = [inv for inv in combined if inv.status == "overdue"]
 
     recent_invoices = sorted(
-        invoices,
+        combined,
         key=lambda x: x.issue_date or datetime.min,
         reverse=True
     )[:5]
@@ -116,7 +127,7 @@ def get_invoice_analytics(
             "status_breakdown": status_counts,
             "recent_invoices": [
                 {
-                    "id": inv.id,
+                    "id": -inv.id if isinstance(inv, ZohoInvoice) else inv.id,
                     "invoice_number": inv.invoice_number,
                     "client_name": inv.client_name,
                     "status": inv.status,
@@ -128,7 +139,7 @@ def get_invoice_analytics(
             ],
             "overdue_invoices": [
                 {
-                    "id": inv.id,
+                    "id": -inv.id if isinstance(inv, ZohoInvoice) else inv.id,
                     "invoice_number": inv.invoice_number,
                     "client_name": inv.client_name,
                     "status": inv.status,
@@ -202,12 +213,52 @@ def get_invoices(
     db: Session = Depends(get_db)
 ):
     query = db.query(Invoice).filter(Invoice.created_by == current_user.id)
-    
+
     if status:
         query = query.filter(Invoice.status == status)
-    
-    invoices = query.offset(skip).limit(limit).all()
-    return invoices
+
+    invoices = query.all()
+
+    zoho_query = db.query(ZohoInvoice).filter(
+        (ZohoInvoice.created_by == current_user.id) | (ZohoInvoice.created_by.is_(None))
+    )
+    if status:
+        zoho_query = zoho_query.filter(ZohoInvoice.status == status)
+    zoho_invoices = zoho_query.all()
+
+    combined = []
+    combined.extend(invoices)
+    combined.extend([
+        {
+            "id": -zi.id,
+            "invoice_number": zi.invoice_number,
+            "client_name": zi.client_name,
+            "client_email": zi.client_email,
+            "client_address": zi.client_address,
+            "client_phone": zi.client_phone,
+            "title": zi.title or "Zoho Invoice",
+            "description": zi.description,
+            "amount": zi.amount,
+            "tax_rate": zi.tax_rate,
+            "total_amount": zi.total_amount,
+            "status": zi.status,
+            "issue_date": zi.issue_date,
+            "due_date": zi.due_date,
+            "paid_date": zi.paid_date,
+            "created_by": zi.created_by or current_user.id,
+            "created_at": zi.created_at,
+            "updated_at": zi.updated_at,
+            "items": [],
+        }
+        for zi in zoho_invoices
+    ])
+
+    combined.sort(
+        key=lambda x: x.issue_date if hasattr(x, "issue_date") else x.get("issue_date"),
+        reverse=True
+    )
+    paged = combined[skip: skip + limit]
+    return paged
 
 @router.get("/{invoice_id}", response_model=InvoiceResponse)
 def get_invoice(
@@ -219,11 +270,39 @@ def get_invoice(
         Invoice.id == invoice_id,
         Invoice.created_by == current_user.id
     ).first()
-    
-    if not invoice:
+
+    if invoice_id < 0:
+        invoice = None
+
+    if invoice:
+        return invoice
+
+    zoho_id = abs(invoice_id) if invoice_id < 0 else invoice_id
+    zoho = db.query(ZohoInvoice).filter(ZohoInvoice.id == zoho_id).first()
+    if not zoho:
         raise HTTPException(status_code=404, detail="Invoice not found")
-    
-    return invoice
+
+    return {
+        "id": zoho.id,
+        "invoice_number": zoho.invoice_number,
+        "client_name": zoho.client_name,
+        "client_email": zoho.client_email,
+        "client_address": zoho.client_address,
+        "client_phone": zoho.client_phone,
+        "title": zoho.title or "Zoho Invoice",
+        "description": zoho.description,
+        "amount": zoho.amount,
+        "tax_rate": zoho.tax_rate,
+        "total_amount": zoho.total_amount,
+        "status": zoho.status,
+        "issue_date": zoho.issue_date,
+        "due_date": zoho.due_date,
+        "paid_date": zoho.paid_date,
+        "created_by": zoho.created_by or current_user.id,
+        "created_at": zoho.created_at,
+        "updated_at": zoho.updated_at,
+        "items": [],
+    }
 
 @router.put("/{invoice_id}", response_model=InvoiceResponse)
 def update_invoice(

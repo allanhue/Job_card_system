@@ -20,6 +20,36 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+.page-fade {
+  animation: pageFade 0.4s ease;
+}
+
+.toast-in {
+  animation: toastIn 0.25s ease;
+}
+
+@keyframes pageFade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 
 
 /* Button styles */

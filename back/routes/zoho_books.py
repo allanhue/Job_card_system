@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime, timedelta
@@ -6,6 +6,9 @@ from dotenv import load_dotenv
 import requests
 import logging
 import os
+from db import get_db
+from sqlalchemy.orm import Session
+from routes.auth import get_current_user, User, ZohoInvoice
 
 # Load environment variables
 load_dotenv()
@@ -527,4 +530,104 @@ def get_activity_logs():
         
     except Exception as e:
         logger.exception("Failed to fetch activity logs")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/invoices/sync")
+def sync_invoices_to_db(
+    status: Optional[str] = "all",
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Sync Zoho Books invoices into local database"""
+    try:
+        logger.info(f"Syncing invoices with status: {status}")
+
+        if not ZOHO_CONFIG.get("organization_id"):
+            raise HTTPException(
+                status_code=400,
+                detail="ZOHO_ORGANIZATION_ID not set. Use /organizations endpoint to get your org ID"
+            )
+
+        page = 1
+        per_page = 200
+        synced = 0
+        updated = 0
+
+        while True:
+            params = {
+                "organization_id": ZOHO_CONFIG["organization_id"],
+                "page": page,
+                "per_page": per_page,
+            }
+            if status and status != "all":
+                params["status"] = status
+
+            result = make_zoho_books_request(
+                endpoint="/books/v3/invoices",
+                method="GET",
+                params=params
+            )
+
+            invoices = result.get("invoices", [])
+            for inv in invoices:
+                zoho_id = inv.get("invoice_id")
+                if not zoho_id:
+                    continue
+
+                existing = db.query(ZohoInvoice).filter(ZohoInvoice.zoho_invoice_id == zoho_id).first()
+
+                issue_date = None
+                due_date = None
+                paid_date = None
+                if inv.get("date"):
+                    issue_date = datetime.strptime(inv.get("date"), "%Y-%m-%d")
+                if inv.get("due_date"):
+                    due_date = datetime.strptime(inv.get("due_date"), "%Y-%m-%d")
+
+                total_amount = inv.get("total", 0) or 0
+                balance = inv.get("balance", None)
+
+                data = {
+                    "zoho_invoice_id": zoho_id,
+                    "invoice_number": inv.get("invoice_number") or zoho_id,
+                    "client_name": inv.get("customer_name") or "Unknown",
+                    "client_email": inv.get("customer_email"),
+                    "client_address": None,
+                    "client_phone": None,
+                    "title": "Zoho Invoice",
+                    "description": inv.get("notes"),
+                    "amount": total_amount,
+                    "tax_rate": 0.0,
+                    "total_amount": total_amount,
+                    "balance": balance,
+                    "status": inv.get("status") or "pending",
+                    "issue_date": issue_date or datetime.utcnow(),
+                    "due_date": due_date,
+                    "paid_date": paid_date,
+                    "created_by": current_user.id,
+                }
+
+                if existing:
+                    for key, value in data.items():
+                        setattr(existing, key, value)
+                    updated += 1
+                else:
+                    db.add(ZohoInvoice(**data))
+                    synced += 1
+
+            db.commit()
+
+            page_context = result.get("page_context", {})
+            if not page_context.get("has_more_page"):
+                break
+            page += 1
+
+        return {
+            "success": True,
+            "synced": synced,
+            "updated": updated,
+        }
+
+    except Exception as e:
+        logger.exception("Failed to sync invoices")
         raise HTTPException(status_code=500, detail=str(e))

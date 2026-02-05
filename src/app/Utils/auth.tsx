@@ -48,12 +48,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem("user", JSON.stringify(data.user));
       setUser(data.user);
       
-      // Use window.location instead of router.push for faster navigation
-      window.location.href = "/";
+      router.push("/");
+      router.refresh();
     } catch (error) {
       throw error;
     }
-  }, []);
+  }, [router]);
 
   const logout = useCallback(() => {
     localStorage.clear();

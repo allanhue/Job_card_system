@@ -1,5 +1,6 @@
 import "./globals.css";
 import { AuthProvider } from "./Utils/auth";
+import { ToastProvider } from "./Utils/toast";
 
 export const metadata = {
   title: "JobCard Pro",
@@ -11,7 +12,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className="bg-[var(--background)] text-[var(--foreground)] font-[Inter]">
         <AuthProvider>
-          {children}
+          <ToastProvider>{children}</ToastProvider>
         </AuthProvider>
       </body>
     </html>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import LoadingSpinner from "@/app/components/LoadingSpinner";
 
 interface AnalyticsData {
   total_invoices: number;
@@ -26,9 +27,15 @@ interface ActivityLog {
   email?: string;
 }
 
+interface JobCardStats {
+  series: { date: string; count: number }[];
+  status_counts: Record<string, number>;
+}
+
 export default function Home() {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+  const [jobCardStats, setJobCardStats] = useState<JobCardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -37,10 +44,12 @@ export default function Home() {
   useEffect(() => {
     fetchAnalytics();
     fetchRecentJobCards();
+    fetchJobCardStats();
 
     const interval = setInterval(() => {
       fetchAnalytics();
       fetchRecentJobCards();
+      fetchJobCardStats();
     }, 30000);
 
     return () => clearInterval(interval);
@@ -104,6 +113,22 @@ export default function Home() {
     }
   };
 
+  const fetchJobCardStats = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_URL}/job-cards/stats?days=14`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!res.ok) throw new Error("Failed to fetch job card stats");
+      const result = await res.json();
+      if (result.success && result.data) setJobCardStats(result.data);
+    } catch {
+      setJobCardStats(null);
+    }
+  };
+
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -139,7 +164,7 @@ export default function Home() {
     default: "#8b5cf6",
   };
 
-  const BarChart = () => {
+  const InvoiceStatusBar = () => {
     if (!analytics) return null;
     const statuses = Object.entries(analytics.status_breakdown).filter(
       ([status]) => status !== "draft"
@@ -150,8 +175,8 @@ export default function Home() {
       <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-md hover:shadow-lg transition-all">
         <header className="mb-8 flex items-center justify-between">
           <div>
-            <h3 className="text-xl font-semibold text-slate-900">Invoice Status Overview</h3>
-            <p className="mt-1 text-sm text-slate-500">Distribution by invoice status</p>
+            <h3 className="text-xl font-semibold text-slate-900">Invoice Status</h3>
+            <p className="mt-1 text-sm text-slate-500">Current invoice distribution</p>
           </div>
         </header>
 
@@ -172,6 +197,45 @@ export default function Home() {
                     style={{
                       width: `${percentage}%`,
                       backgroundColor: color,
+                    }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const JobStatusBar = () => {
+    if (!jobCardStats) return null;
+    const statuses = Object.entries(jobCardStats.status_counts);
+    const maxCount = Math.max(1, ...statuses.map(([, count]) => count));
+    const palette = ["#1d4ed8", "#0ea5e9", "#f97316", "#16a34a", "#ef4444", "#8b5cf6"];
+
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-md hover:shadow-lg transition-all">
+        <header className="mb-8">
+          <h3 className="text-xl font-semibold text-slate-900">Job Status</h3>
+          <p className="mt-1 text-sm text-slate-500">Latest job card progression</p>
+        </header>
+
+        <div className="space-y-6">
+          {statuses.map(([status, count], index) => {
+            const percentage = (count / maxCount) * 100;
+            return (
+              <div key={status}>
+                <div className="flex justify-between mb-2">
+                  <span className="capitalize text-slate-700 font-medium">{status.replace("_", " ")}</span>
+                  <span className="text-slate-900 font-semibold">{count}</span>
+                </div>
+                <div className="relative h-3 rounded-full bg-slate-100 overflow-hidden">
+                  <div
+                    className="absolute top-0 left-0 h-full rounded-full transition-all duration-700"
+                    style={{
+                      width: `${percentage}%`,
+                      backgroundColor: palette[index % palette.length],
                     }}
                   />
                 </div>
@@ -251,6 +315,57 @@ export default function Home() {
               );
             })}
           </div>
+        </div>
+      </div>
+    );
+  };
+
+  const EmailLineChart = () => {
+    if (!jobCardStats) return null;
+    const data = jobCardStats.series;
+    if (data.length === 0) return null;
+
+    const width = 520;
+    const height = 160;
+    const padding = 24;
+    const max = Math.max(1, ...data.map((d) => d.count));
+
+    const points = data
+      .map((d, i) => {
+        const x = padding + (i / (data.length - 1 || 1)) * (width - padding * 2);
+        const y = height - padding - (d.count / max) * (height - padding * 2);
+        return `${x},${y}`;
+      })
+      .join(" ");
+
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-md hover:shadow-lg transition-all">
+        <header className="mb-8">
+          <h3 className="text-xl font-semibold text-slate-900">Emails Sent</h3>
+          <p className="mt-1 text-sm text-slate-500">Job card notifications over 14 days</p>
+        </header>
+        <svg width="100%" viewBox={`0 0 ${width} ${height}`}>
+          <defs>
+            <linearGradient id="lineGlow" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#2563eb" stopOpacity="0.35" />
+              <stop offset="100%" stopColor="#2563eb" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <polyline
+            fill="none"
+            stroke="#2563eb"
+            strokeWidth="3"
+            points={points}
+          />
+          <polyline
+            fill="url(#lineGlow)"
+            stroke="none"
+            points={`${points} ${width - padding},${height - padding} ${padding},${height - padding}`}
+          />
+        </svg>
+        <div className="mt-4 flex justify-between text-xs text-slate-500">
+          <span>{data[0]?.date}</span>
+          <span>{data[data.length - 1]?.date}</span>
         </div>
       </div>
     );
@@ -359,7 +474,8 @@ export default function Home() {
 
   if (loading)
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-500">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 text-slate-600 gap-4">
+        <LoadingSpinner size={28} />
         Loading dashboard...
       </div>
     );
@@ -373,70 +489,27 @@ export default function Home() {
 
   if (!analytics) return null;
 
-  const stats = [
-    {
-      label: "Total Revenue",
-      value: formatCurrency(analytics.total_revenue),
-      color: "from-green-500 to-emerald-600",
-    },
-    {
-      label: "Outstanding",
-      value: formatCurrency(analytics.total_outstanding),
-      color: "from-amber-500 to-orange-600",
-    },
-    {
-      label: "Paid Invoices",
-      value: analytics.paid_count,
-      color: "from-blue-500 to-indigo-600",
-    },
-    {
-      label: "Total Invoices",
-      value: analytics.total_invoices,
-      color: "from-purple-500 to-pink-600",
-    },
-  ];
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 px-6 py-10">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 px-6 py-10 page-fade">
       <div className="mx-auto max-w-7xl space-y-10">
         <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Dashboard Overview</h1>
-          <p className="mt-2 text-slate-500 text-sm">Financial insights and recent activity</p>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Analytics Dashboard</h1>
+          <p className="mt-2 text-slate-500 text-sm">Operational insights and job performance</p>
         </header>
 
         <OverdueAlert />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <BarChart />
+          <EmailLineChart />
+          <InvoiceStatusBar />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <JobStatusBar />
           <PieChart />
         </div>
 
         <ActivityLogs />
-
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {stats.map((stat, index) => (
-            <div
-              key={index}
-              className="rounded-2xl border border-slate-200 bg-white/80 p-6 text-center shadow-md backdrop-blur-sm transition hover:-translate-y-1 hover:shadow-lg"
-            >
-              <div
-                className={`mx-auto mb-3 h-10 w-10 rounded-full bg-gradient-to-br ${stat.color} flex items-center justify-center text-white shadow-sm`}
-              >
-                <svg
-                  className="h-5 w-5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v8m4-4H8" />
-                </svg>
-              </div>
-              <p className="text-sm text-slate-500">{stat.label}</p>
-              <p className="mt-1 text-2xl font-bold text-slate-900">{stat.value}</p>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   );

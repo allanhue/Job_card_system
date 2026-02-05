@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { Invoice } from "./InvoiceList";
+import { useToast } from "@/app/Utils/toast";
+import LoadingSpinner from "@/app/components/LoadingSpinner";
 
 interface JobCardModalProps {
   showJobModal: boolean;
@@ -25,18 +27,9 @@ export default function JobCardModal({
   const [jobDescription, setJobDescription] = useState("");
   const [additionalNotes, setAdditionalNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
-  const toastTimer = useRef<number | null>(null);
+  const { pushToast } = useToast();
 
   const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
-
-  const showToast = (type: "success" | "error", message: string) => {
-    setToast({ type, message });
-    if (toastTimer.current) {
-      window.clearTimeout(toastTimer.current);
-    }
-    toastTimer.current = window.setTimeout(() => setToast(null), 3000);
-  };
 
   const handleSubmit = async () => {
     setSubmitting(true);
@@ -60,11 +53,11 @@ export default function JobCardModal({
       });
 
       if (!res.ok) throw new Error("Failed to submit job card");
-      showToast("success", "Job card submitted successfully.");
+      pushToast("success", "Job card submitted successfully.");
       setJobDescription("");
       setAdditionalNotes("");
     } catch (err) {
-      showToast("error", err instanceof Error ? err.message : "Failed to submit job card");
+      pushToast("error", err instanceof Error ? err.message : "Failed to submit job card");
     } finally {
       setSubmitting(false);
     }
@@ -72,17 +65,6 @@ export default function JobCardModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      {toast && (
-        <div
-          className={`fixed top-6 right-6 z-50 rounded-xl px-4 py-3 text-sm shadow-lg ${
-            toast.type === "success"
-              ? "bg-emerald-600 text-white"
-              : "bg-red-600 text-white"
-          }`}
-        >
-          {toast.message}
-        </div>
-      )}
       <div className="w-full max-w-4xl max-h-[95vh] overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-xl">
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-200 p-4 sm:p-6">
@@ -408,9 +390,7 @@ export default function JobCardModal({
               disabled={submitting}
               className="flex-1 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-3 font-medium text-white transition-all hover:from-orange-600 hover:to-orange-700 hover:shadow-lg hover:shadow-orange-500/30 order-1 sm:order-2 disabled:opacity-60 flex items-center justify-center gap-2"
             >
-              {submitting && (
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/60 border-t-transparent" />
-              )}
+              {submitting && <LoadingSpinner size={16} />}
               Send Email Notification
             </button>
           </div>

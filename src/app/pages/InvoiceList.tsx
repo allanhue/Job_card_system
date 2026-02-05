@@ -45,6 +45,8 @@ export default function InvoiceList() {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [showJobModal, setShowJobModal] = useState(false);
   const [loadingInvoiceDetails, setLoadingInvoiceDetails] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState("");
 
   const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
@@ -101,6 +103,25 @@ export default function InvoiceList() {
     }
   };
 
+  const syncZohoInvoices = async () => {
+    setSyncing(true);
+    setSyncError("");
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/zoho_books/books/invoices/sync`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) throw new Error("Failed to sync Zoho invoices");
+      await fetchInvoices(statusFilter);
+    } catch (err) {
+      setSyncError(err instanceof Error ? err.message : "Failed to sync Zoho invoices");
+    } finally {
+      setSyncing(false);
+    }
+  };
   const handleApplyJob = (invoice: Invoice) => {
     fetchInvoiceDetails(invoice.id.toString());
   };
@@ -172,8 +193,23 @@ export default function InvoiceList() {
             <h1 className="text-3xl font-semibold text-[var(--foreground)]">Invoices</h1>
             <p className="mt-2 text-[var(--foreground-muted)]">Manage and apply for job cards</p>
           </div>
-          <button className="btn btn-primary">New Invoice</button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={syncZohoInvoices}
+              disabled={syncing}
+              className="btn border border-[var(--accent-primary)]/40 bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/20 disabled:opacity-50"
+            >
+              {syncing ? "Syncing..." : "Sync Zoho"}
+            </button>
+            <button className="btn btn-primary">New Invoice</button>
+          </div>
         </div>
+
+        {syncError && (
+          <div className="card border-[var(--accent-danger)]/40 bg-[var(--accent-danger)]/10 text-[var(--accent-danger)] p-4 font-medium">
+            {syncError}
+          </div>
+        )}
 
         {/* Filters */}
         <div className="rounded-xl border border-[var(--border-color)] bg-[var(--background-card)] p-4">

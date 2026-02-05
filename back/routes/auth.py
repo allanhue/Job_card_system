@@ -101,6 +101,30 @@ class InvoiceItem(Base):
     unit_price = Column(Float, nullable=False)
     total_price = Column(Float, nullable=False)
 
+class ZohoInvoice(Base):
+    __tablename__ = "zoho_invoices"
+
+    id = Column(Integer, primary_key=True, index=True)
+    zoho_invoice_id = Column(String, unique=True, index=True, nullable=False)
+    invoice_number = Column(String, index=True, nullable=False)
+    client_name = Column(String, nullable=False)
+    client_email = Column(String, nullable=True)
+    client_address = Column(Text, nullable=True)
+    client_phone = Column(String, nullable=True)
+    title = Column(String, nullable=True)
+    description = Column(Text, nullable=True)
+    amount = Column(Float, nullable=False)
+    tax_rate = Column(Float, default=0.0)
+    total_amount = Column(Float, nullable=False)
+    balance = Column(Float, nullable=True)
+    status = Column(String, default="pending")
+    issue_date = Column(DateTime, default=datetime.utcnow)
+    due_date = Column(DateTime, nullable=True)
+    paid_date = Column(DateTime, nullable=True)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 class JobCard(Base):
     __tablename__ = "job_cards"
 

@@ -4,8 +4,9 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from db import get_db
-from routes.auth import get_current_user, User, Invoice, JobCard
+from routes.auth import get_current_user, User, Invoice, JobCard, ZohoInvoice
 from routes.send_mail import send_email
+from datetime import timedelta
 
 router = APIRouter(prefix="/job-cards", tags=["JobCards"])
 
@@ -52,12 +53,18 @@ async def create_job_card(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    normalized_id = abs(invoice_id) if invoice_id < 0 else invoice_id
+
     invoice = db.query(Invoice).filter(
-        Invoice.id == invoice_id,
+        Invoice.id == normalized_id,
         Invoice.created_by == current_user.id
     ).first()
 
+    zoho_invoice = None
     if not invoice:
+        zoho_invoice = db.query(ZohoInvoice).filter(ZohoInvoice.id == normalized_id).first()
+
+    if not invoice and not zoho_invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
     total_selected_amount = 0.0
@@ -69,11 +76,14 @@ async def create_job_card(
 
     job_card_number = generate_job_card_number(db)
 
+    invoice_number = invoice.invoice_number if invoice else zoho_invoice.invoice_number
+    client_name = invoice.client_name if invoice else zoho_invoice.client_name
+
     job_card = JobCard(
         job_card_number=job_card_number,
-        invoice_id=invoice.id,
-        invoice_number=invoice.invoice_number,
-        client_name=invoice.client_name,
+        invoice_id=invoice.id if invoice else zoho_invoice.id,
+        invoice_number=invoice_number,
+        client_name=client_name,
         email=job_card_data.email,
         status=job_card_data.status or "pending",
         notes=job_card_data.notes,
@@ -128,4 +138,46 @@ def get_recent_job_cards(
             }
             for jc in job_cards
         ],
+    }
+
+
+@router.get("/stats")
+def get_job_card_stats(
+    days: int = 14,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if days < 1:
+        days = 1
+
+    end_date = datetime.utcnow().date()
+    start_date = end_date - timedelta(days=days - 1)
+
+    job_cards = db.query(JobCard).filter(
+        JobCard.created_by == current_user.id,
+        JobCard.created_at >= datetime.combine(start_date, datetime.min.time())
+    ).all()
+
+    date_cursor = start_date
+    counts = {}
+    while date_cursor <= end_date:
+        counts[date_cursor.isoformat()] = 0
+        date_cursor = date_cursor + timedelta(days=1)
+
+    status_counts = {}
+    for jc in job_cards:
+        created_date = jc.created_at.date().isoformat()
+        if jc.email:
+            counts[created_date] = counts.get(created_date, 0) + 1
+        status = (jc.status or "pending").lower()
+        status_counts[status] = status_counts.get(status, 0) + 1
+
+    series = [{"date": d, "count": counts[d]} for d in sorted(counts.keys())]
+
+    return {
+        "success": True,
+        "data": {
+            "series": series,
+            "status_counts": status_counts,
+        }
     }
