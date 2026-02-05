@@ -8,6 +8,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   loading: boolean;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -33,6 +34,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(false);
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      localStorage.setItem("user", JSON.stringify(data));
+      setUser(data);
+    } catch {
+      // noop
+    }
+  }, []);
+
   const login = useCallback(async (email: string, password: string) => {
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/auth/login`, {
@@ -47,13 +64,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem("token", data.access_token);
       localStorage.setItem("user", JSON.stringify(data.user));
       setUser(data.user);
-      
-      router.push("/");
-      router.refresh();
+      return data.user;
     } catch (error) {
       throw error;
     }
-  }, [router]);
+  }, []);
 
   const logout = useCallback(() => {
     localStorage.clear();
@@ -61,7 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push("/login");
   }, [router]);
 
-  const value = { user, login, logout, loading };
+  const value = { user, login, logout, loading, refreshUser };
 
   return (
     <AuthContext.Provider value={value}>

@@ -26,6 +26,14 @@ export default function JobCardModal({
   const [jobStatus, setJobStatus] = useState("pending");
   const [jobDescription, setJobDescription] = useState("");
   const [additionalNotes, setAdditionalNotes] = useState("");
+  const [workDate, setWorkDate] = useState(new Date().toISOString().split("T")[0]);
+  const [workTime, setWorkTime] = useState(new Date().toTimeString().slice(0, 5));
+  const [workHours, setWorkHours] = useState("");
+  const [workType, setWorkType] = useState("");
+  const [workDesc, setWorkDesc] = useState("");
+  const [photos, setPhotos] = useState<File[]>([]);
+  const [documents, setDocuments] = useState<File[]>([]);
+  const [voiceNote, setVoiceNote] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const { pushToast } = useToast();
 
@@ -36,31 +44,88 @@ export default function JobCardModal({
     try {
       const token = localStorage.getItem("token");
       const notes = [jobDescription, additionalNotes].filter(Boolean).join("\n\n");
-      const payload = {
-        email,
-        status: jobStatus || "pending",
-        notes,
-        selected_items: [],
-      };
+      const workLogs = [
+        {
+          date: workDate,
+          time: workTime,
+          hours: workHours ? Number(workHours) : 0,
+          task_type: workType,
+          description: workDesc,
+        },
+      ];
+
+      const okPhotos = validateFiles(photos, 10 * 1024 * 1024, [
+        "image/jpeg",
+        "image/png",
+        "image/gif",
+        "image/webp",
+      ]);
+      const okDocs = validateFiles(documents, 5 * 1024 * 1024, [
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ]);
+      const okVoice = voiceNote
+        ? validateFiles([voiceNote], 25 * 1024 * 1024, [
+            "audio/mpeg",
+            "audio/wav",
+            "audio/webm",
+            "audio/ogg",
+            "audio/mp4",
+          ])
+        : true;
+      if (!okPhotos || !okDocs || !okVoice) {
+        setSubmitting(false);
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("email", email);
+      formData.append("status", jobStatus || "pending");
+      formData.append("notes", notes);
+      formData.append("selected_items", JSON.stringify([]));
+      formData.append("work_logs", JSON.stringify(workLogs));
+      photos.forEach((file) => formData.append("photos", file));
+      documents.forEach((file) => formData.append("documents", file));
+      if (voiceNote) formData.append("voice_note", voiceNote);
 
       const res = await fetch(`${API_URL}/job-cards/invoice/${selectedInvoice.id}`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(payload),
+        body: formData,
       });
 
       if (!res.ok) throw new Error("Failed to submit job card");
       pushToast("success", "Job card submitted successfully.");
       setJobDescription("");
       setAdditionalNotes("");
+      setWorkHours("");
+      setWorkType("");
+      setWorkDesc("");
+      setPhotos([]);
+      setDocuments([]);
+      setVoiceNote(null);
     } catch (err) {
       pushToast("error", err instanceof Error ? err.message : "Failed to submit job card");
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const validateFiles = (files: File[], maxBytes: number, allowed: string[]) => {
+    for (const file of files) {
+      if (!allowed.includes(file.type)) {
+        pushToast("error", `Invalid file type: ${file.name}`);
+        return false;
+      }
+      if (file.size > maxBytes) {
+        pushToast("error", `File too large: ${file.name}`);
+        return false;
+      }
+    }
+    return true;
   };
 
   return (
@@ -141,20 +206,18 @@ export default function JobCardModal({
                   <label className="block text-xs font-medium text-gray-700 mb-1">Date</label>
                   <input
                     type="date"
-                    value={new Date().toISOString().split('T')[0]}
-                    readOnly
-                    className="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-600 cursor-not-allowed"
-                    title="Current date (auto-generated)"
+                    value={workDate}
+                    onChange={(e) => setWorkDate(e.target.value)}
+                    className="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-600"
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Time</label>
                   <input
                     type="time"
-                    value={new Date().toTimeString().slice(0, 5)}
-                    readOnly
-                    className="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-600 cursor-not-allowed"
-                    title="Current time (auto-generated)"
+                    value={workTime}
+                    onChange={(e) => setWorkTime(e.target.value)}
+                    className="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-600"
                   />
                 </div>
                 <div>
@@ -164,12 +227,18 @@ export default function JobCardModal({
                     step="0.5"
                     min="0"
                     placeholder="0.0"
+                    value={workHours}
+                    onChange={(e) => setWorkHours(e.target.value)}
                     className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-orange-500 focus:outline-none"
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Task Type</label>
-                  <select className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-orange-500 focus:outline-none">
+                  <select
+                    value={workType}
+                    onChange={(e) => setWorkType(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-orange-500 focus:outline-none"
+                  >
                     <option value="">Select...</option>
                     <option value="labor">Labor</option>
                     <option value="materials">Materials</option>
@@ -184,6 +253,8 @@ export default function JobCardModal({
                 <textarea
                   rows={2}
                   placeholder="Describe what was done during this time..."
+                  value={workDesc}
+                  onChange={(e) => setWorkDesc(e.target.value)}
                   className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-orange-500 focus:outline-none"
                 />
               </div>
@@ -200,7 +271,7 @@ export default function JobCardModal({
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Upload Photos
                 </label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 sm:p-6 text-center hover:border-orange-400 transition-colors">
+                <label htmlFor="photo-upload" className="border-2 border-dashed border-gray-300 rounded-lg p-4 sm:p-6 text-center hover:border-orange-400 transition-colors cursor-pointer block">
                   <svg className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
@@ -208,12 +279,14 @@ export default function JobCardModal({
                     <span className="font-medium text-orange-600">Click to upload</span> or drag and drop
                   </p>
                   <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
-                </div>
+                </label>
                 <input
+                  id="photo-upload"
                   type="file"
                   multiple
                   accept="image/*"
                   className="hidden"
+                  onChange={(e) => setPhotos(Array.from(e.target.files || []))}
                 />
               </div>
 
@@ -222,7 +295,7 @@ export default function JobCardModal({
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Upload Documents
                 </label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-orange-400 transition-colors">
+                <label htmlFor="doc-upload" className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-orange-400 transition-colors cursor-pointer block">
                   <svg className="mx-auto h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
@@ -230,12 +303,14 @@ export default function JobCardModal({
                     <span className="font-medium text-orange-600">Click to upload</span> or drag and drop
                   </p>
                   <p className="text-xs text-gray-500">PDF, DOC, DOCX up to 5MB</p>
-                </div>
+                </label>
                 <input
+                  id="doc-upload"
                   type="file"
                   multiple
                   accept=".pdf,.doc,.docx"
                   className="hidden"
+                  onChange={(e) => setDocuments(Array.from(e.target.files || []))}
                 />
               </div>
             </div>
@@ -246,21 +321,23 @@ export default function JobCardModal({
             <h3 className="font-medium text-gray-900 mb-3 sm:mb-4">Voice Recording</h3>
             
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
-              <button
-                type="button"
-                className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors w-full sm:w-auto"
-              >
+              <label className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors w-full sm:w-auto cursor-pointer">
+                <input
+                  type="file"
+                  accept="audio/*"
+                  className="hidden"
+                  onChange={(e) => setVoiceNote(e.target.files?.[0] || null)}
+                />
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                 </svg>
-                Start Recording
-              </button>
+                Upload Voice Note
+              </label>
               
               <div className="flex-1 w-full">
-                <div className="bg-gray-100 rounded-lg h-2">
-                  <div className="bg-red-500 h-2 rounded-lg" style={{width: '0%'}}></div>
-                </div>
-                <p className="text-xs text-gray-500 mt-1">00:00 / 00:00</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {voiceNote ? `Selected: ${voiceNote.name}` : "No voice note selected"}
+                </p>
               </div>
             </div>
             

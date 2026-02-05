@@ -6,6 +6,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "./Utils/auth";
 import NavBar from "./components/nav_bar";
 import Login from "./pages/login";
+import PasswordRecovery from "./pages/PasswordRecovery";
 import LoadingSpinner from "./components/LoadingSpinner";
 
 const Home = dynamic(() => import("./pages/Home"), { ssr: false });
@@ -13,7 +14,7 @@ const InvoiceList = dynamic(() => import("./pages/InvoiceList"), { ssr: false })
 const Profile = dynamic(() => import("./pages/Profile"), { ssr: false });
 
 export default function Page() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [currentPage, setCurrentPage] = useState(
@@ -52,13 +53,22 @@ export default function Page() {
 
   const effectivePage = pageParam || currentPage;
 
-  if (!user && effectivePage !== "login") {
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600 gap-3">
+        <LoadingSpinner size={28} />
+        Loading...
+      </div>
+    );
+  }
+
+  if (!user && !["login", "forgot", "reset"].includes(effectivePage)) {
     return <Login />;
   }
 
   return (
     <>
-      <NavBar currentPage={currentPage} onNavigate={handleNavigate} />
+      {user && <NavBar currentPage={currentPage} onNavigate={handleNavigate} />}
       <main className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
         <Suspense
           fallback={
@@ -74,6 +84,8 @@ export default function Page() {
           )}
           {effectivePage === "profile" && <Profile />}
           {effectivePage === "login" && <Login />}
+          {effectivePage === "forgot" && <PasswordRecovery />}
+          {effectivePage === "reset" && <PasswordRecovery />}
         </Suspense>
       </main>
     </>

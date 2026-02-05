@@ -55,6 +55,7 @@ export default function InvoiceList({
   const [loadingInvoiceDetails, setLoadingInvoiceDetails] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState("");
+  const [autoOpened, setAutoOpened] = useState(false);
 
   const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
@@ -73,6 +74,13 @@ export default function InvoiceList({
       setStatusFilter("all");
     }
   }, [initialView, statusFilter]);
+
+  useEffect(() => {
+    const openId = initialView ? null : searchParams?.get("openInvoice");
+    if (!openId || autoOpened) return;
+    setAutoOpened(true);
+    fetchInvoiceDetails(openId);
+  }, [searchParams, autoOpened, initialView]);
 
   const fetchInvoices = async (status: string) => {
     setLoading(true);

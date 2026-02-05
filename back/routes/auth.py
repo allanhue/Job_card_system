@@ -37,6 +37,13 @@ class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str
 
+class AdminCreateUserRequest(BaseModel):
+    email: str
+    full_name: str | None = None
+    role: str = "user"  # user | admin
+    temp_password: str | None = None
+    send_link: bool = True
+
 class PromoteUser(BaseModel):
     email: str
 
@@ -156,6 +163,9 @@ class JobCard(Base):
     notes = Column(Text, nullable=True)
     selected_items = Column(JSON, nullable=True)
     total_selected_amount = Column(Float, default=0.0)
+    work_logs = Column(JSON, nullable=True)
+    attachments = Column(JSON, nullable=True)
+    voice_note_path = Column(String, nullable=True)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -315,6 +325,75 @@ def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db))
     db.commit()
 
     return {"message": "Password reset successful"}
+
+
+@router.post("/admin/create-user")
+async def admin_create_user(
+    payload: AdminCreateUserRequest,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    role = payload.role.lower()
+    if role not in ["admin", "user"]:
+        raise HTTPException(status_code=400, detail="Invalid role")
+
+    user = db.query(User).filter(User.email == payload.email).first()
+    created = False
+
+    if not user:
+        password = payload.temp_password or secrets.token_urlsafe(16)
+        user = User(
+            email=payload.email,
+            password=get_password_hash(password),
+            full_name=payload.full_name
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        created = True
+    else:
+        if payload.full_name:
+            user.full_name = payload.full_name
+        if payload.temp_password:
+            user.password = get_password_hash(payload.temp_password)
+        db.commit()
+
+    user.is_admin = role == "admin"
+    db.commit()
+
+    if payload.send_link:
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.utcnow() + timedelta(hours=1)
+        reset = PasswordResetToken(
+            user_id=user.id,
+            token=token,
+            expires_at=expires_at
+        )
+        db.add(reset)
+        db.commit()
+
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        reset_link = f"{frontend_url}/?page=reset&token={token}"
+        from routes.send_mail import send_email
+        subject = "Set Your Password"
+        body = (
+            "<p>Your account has been created by an administrator.</p>"
+            f"<p><a href=\"{reset_link}\">Click here to set your password</a></p>"
+            "<p>This link expires in 1 hour.</p>"
+        )
+        try:
+            await send_email([user.email], subject, body)
+        except Exception:
+            pass
+
+    return {
+        "message": "User created" if created else "User updated",
+        "user": {
+            "email": user.email,
+            "full_name": user.full_name,
+            "role": "admin" if user.is_admin else "user",
+        }
+    }
 
 
 @router.get("/me")

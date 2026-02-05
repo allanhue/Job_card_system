@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import LoadingSpinner from "@/app/components/LoadingSpinner";
+import { useAuth } from "@/app/Utils/auth";
 
 interface AnalyticsData {
   total_invoices: number;
@@ -29,13 +30,21 @@ interface ActivityLog {
 
 interface JobCardStats {
   series: { date: string; count: number }[];
+  hours_series?: { date: string; hours: number }[];
   status_counts: Record<string, number>;
+  total_jobs?: number;
+  total_hours?: number;
+  total_attachments?: number;
+  top_customers?: { name: string; count: number }[];
 }
 
 export default function Home() {
+  const { user } = useAuth();
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [jobCardStats, setJobCardStats] = useState<JobCardStats | null>(null);
+  const [viewMode, setViewMode] = useState<"summary" | "detailed">("summary");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -53,7 +62,7 @@ export default function Home() {
     }, 30000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [statusFilter]);
 
   const fetchAnalytics = async () => {
     setLoading(true);
@@ -96,6 +105,9 @@ export default function Home() {
               : status === "assigned"
               ? "assigned"
               : "application";
+          const hours = Array.isArray(jc.work_logs)
+            ? jc.work_logs.reduce((sum: number, log: any) => sum + (Number(log.hours) || 0), 0)
+            : 0;
           return {
             id: String(jc.id),
             type,
@@ -104,6 +116,7 @@ export default function Home() {
             timestamp: formatTimeAgo(jc.created_at),
             status: jc.status,
             email: jc.email,
+            hours: hours || undefined,
           } as ActivityLog;
         });
         setActivityLogs(logs);
@@ -116,7 +129,8 @@ export default function Home() {
   const fetchJobCardStats = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${API_URL}/job-cards/stats?days=14`, {
+      const statusParam = statusFilter !== "all" ? `&status=${statusFilter}` : "";
+      const res = await fetch(`${API_URL}/job-cards/stats?days=14${statusParam}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -371,6 +385,57 @@ export default function Home() {
     );
   };
 
+  const HoursLineChart = () => {
+    if (!jobCardStats?.hours_series) return null;
+    const data = jobCardStats.hours_series;
+    if (data.length === 0) return null;
+
+    const width = 520;
+    const height = 160;
+    const padding = 24;
+    const max = Math.max(1, ...data.map((d) => d.hours));
+
+    const points = data
+      .map((d, i) => {
+        const x = padding + (i / (data.length - 1 || 1)) * (width - padding * 2);
+        const y = height - padding - (d.hours / max) * (height - padding * 2);
+        return `${x},${y}`;
+      })
+      .join(" ");
+
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-md hover:shadow-lg transition-all">
+        <header className="mb-8">
+          <h3 className="text-xl font-semibold text-slate-900">Hours Logged</h3>
+          <p className="mt-1 text-sm text-slate-500">Work hours over 14 days</p>
+        </header>
+        <svg className="w-full h-48" viewBox={`0 0 ${width} ${height}`}>
+          <defs>
+            <linearGradient id="hoursGlow" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#16a34a" stopOpacity="0.35" />
+              <stop offset="100%" stopColor="#16a34a" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <polyline
+            fill="none"
+            stroke="#16a34a"
+            strokeWidth="3"
+            points={points}
+          />
+          <polyline
+            fill="url(#hoursGlow)"
+            stroke="none"
+            points={`${points} ${width - padding},${height - padding} ${padding},${height - padding}`}
+          />
+        </svg>
+        <div className="mt-4 flex justify-between text-xs text-slate-500">
+          <span>{data[0]?.date}</span>
+          <span>{data[data.length - 1]?.date}</span>
+        </div>
+      </div>
+    );
+  };
+
   const ActivityLogs = () => (
     <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-md hover:shadow-lg transition-all">
       <header className="mb-8 flex justify-between items-center">
@@ -493,8 +558,35 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 px-4 sm:px-6 py-8 sm:py-10 page-fade">
       <div className="mx-auto max-w-7xl space-y-10">
         <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Analytics Dashboard</h1>
-          <p className="mt-2 text-slate-500 text-sm">Operational insights and job performance</p>
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Analytics Dashboard</h1>
+            <p className="mt-2 text-slate-500 text-sm">Operational insights and job performance</p>
+          </div>
+          {user?.is_admin && (
+            <div className="mt-4 sm:mt-0 flex items-center gap-3">
+              <select
+                value={viewMode}
+                onChange={(e) => setViewMode(e.target.value as "summary" | "detailed")}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700"
+              >
+                <option value="summary">Summary</option>
+                <option value="detailed">Detailed</option>
+              </select>
+              {viewMode === "detailed" && (
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700"
+                >
+                  <option value="all">All statuses</option>
+                  <option value="pending">Pending</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              )}
+            </div>
+          )}
         </header>
 
         <OverdueAlert />
@@ -508,6 +600,47 @@ export default function Home() {
           <JobStatusBar />
           <PieChart />
         </div>
+
+        {user?.is_admin && viewMode === "detailed" && jobCardStats && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <HoursLineChart />
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-md">
+              <h3 className="text-lg font-semibold text-slate-900 mb-4">Key Totals</h3>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <p className="text-slate-500">Total Job Cards</p>
+                  <p className="text-xl font-semibold text-slate-900">{jobCardStats.total_jobs ?? 0}</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <p className="text-slate-500">Total Hours</p>
+                  <p className="text-xl font-semibold text-slate-900">{jobCardStats.total_hours ?? 0}</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <p className="text-slate-500">Attachments</p>
+                  <p className="text-xl font-semibold text-slate-900">{jobCardStats.total_attachments ?? 0}</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <p className="text-slate-500">Overdue Invoices</p>
+                  <p className="text-xl font-semibold text-slate-900">{analytics?.overdue_count ?? 0}</p>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-md">
+              <h3 className="text-lg font-semibold text-slate-900 mb-4">Top Customers</h3>
+              <div className="space-y-3 text-sm">
+                {(jobCardStats.top_customers || []).map((c) => (
+                  <div key={c.name} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                    <span className="text-slate-700">{c.name}</span>
+                    <span className="text-slate-900 font-semibold">{c.count}</span>
+                  </div>
+                ))}
+                {(!jobCardStats.top_customers || jobCardStats.top_customers.length === 0) && (
+                  <p className="text-slate-500">No customer data yet.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         <ActivityLogs />
       </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "../Utils/auth";
+import { useEffect, useState } from "react";
 
 interface NavBarProps {
   currentPage: string;
@@ -9,9 +10,16 @@ interface NavBarProps {
 
 export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
   const { user, logout } = useAuth();
+  const [showPicker, setShowPicker] = useState(false);
+  const [pickerLoading, setPickerLoading] = useState(false);
+  const [pickerError, setPickerError] = useState("");
+  const [invoiceOptions, setInvoiceOptions] = useState<
+    { id: number; invoice_number: string; client_name: string }[]
+  >([]);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>("");
   
   const navItems = [
-    { name: "Dashboard", key: "home" },
+    ...(user?.is_admin ? [{ name: "Dashboard", key: "home" }] : []),
     { name: "Invoices", key: "invoices" },
     { name: "Profile", key: "profile" },
   ];
@@ -21,8 +29,43 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
     // The auth context will handle redirect to login
   };
 
+  useEffect(() => {
+    if (!showPicker) return;
+    const fetchInvoices = async () => {
+      setPickerLoading(true);
+      setPickerError("");
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/invoices`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error("Failed to load invoices");
+        const data = await res.json();
+        setInvoiceOptions(
+          (data || []).map((inv: any) => ({
+            id: inv.id,
+            invoice_number: inv.invoice_number,
+            client_name: inv.client_name,
+          }))
+        );
+      } catch (err) {
+        setPickerError(err instanceof Error ? err.message : "Failed to load invoices");
+      } finally {
+        setPickerLoading(false);
+      }
+    };
+    fetchInvoices();
+  }, [showPicker]);
+
+  const handleOpenJob = () => {
+    if (!selectedInvoiceId) return;
+    onNavigate("invoices");
+    const url = `/?page=invoices&openInvoice=${encodeURIComponent(selectedInvoiceId)}`;
+    window.location.href = url;
+  };
+
   return (
-    <nav className="sticky top-0 z-40 w-full border-b border-[#e9ecef] bg-white/80 backdrop-blur-md shadow-sm">
+    <nav className="sticky top-0 z-40 w-full border-b border-[#e9ecef] bg-white/80 backdrop-blur-md shadow-sm page-fade">
       <div className="mx-auto max-w-7xl px-3 sm:px-4 lg:px-8">
         <div className="flex h-12 sm:h-14 items-center justify-between">
           {/* Logo */}
@@ -78,7 +121,10 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
             >
               Logout
             </button>
-            <button className="text-xs sm:text-sm rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 px-2 sm:px-3 py-1.5 sm:py-2 font-medium text-white transition-all hover:from-orange-600 hover:to-orange-700 hover:shadow-md">
+            <button
+              onClick={() => setShowPicker(true)}
+              className="text-xs sm:text-sm rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 px-2 sm:px-3 py-1.5 sm:py-2 font-medium text-white transition-all hover:from-orange-600 hover:to-orange-700 hover:shadow-md"
+            >
               Create Job
             </button>
           </div>
@@ -126,6 +172,48 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
           </div>
         </div>
       </div>
+
+      {showPicker && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 px-4 pt-24 pb-6">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl border border-slate-200">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-base font-semibold text-slate-900">Select Invoice</h3>
+                <p className="text-xs text-slate-500">Choose which invoice to apply a job card</p>
+              </div>
+              <button
+                onClick={() => setShowPicker(false)}
+                className="text-xs text-slate-500 hover:text-slate-700"
+              >
+                Close
+              </button>
+            </div>
+            {pickerLoading && <p className="text-xs text-slate-500">Loading invoices...</p>}
+            {pickerError && <p className="text-xs text-red-600">{pickerError}</p>}
+            {!pickerLoading && !pickerError && (
+              <select
+                value={selectedInvoiceId}
+                onChange={(e) => setSelectedInvoiceId(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-slate-50 focus:border-orange-500 focus:outline-none"
+              >
+                <option value="">Choose invoice...</option>
+                {invoiceOptions.map((inv) => (
+                  <option key={inv.id} value={inv.id}>
+                    {inv.invoice_number} - {inv.client_name}
+                  </option>
+                ))}
+              </select>
+            )}
+            <button
+              onClick={handleOpenJob}
+              disabled={!selectedInvoiceId}
+              className="mt-4 w-full rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 text-white py-2 text-sm font-semibold disabled:opacity-50"
+            >
+              Open Job Card
+            </button>
+          </div>
+        </div>
+      )}
     </nav>
   );
 }
