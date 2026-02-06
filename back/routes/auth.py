@@ -431,7 +431,17 @@ async def admin_create_user(
 
 
 @router.get("/me")
-def get_current_user_info(current_user: User = Depends(get_current_user)):
+def get_current_user_info(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        current_user.last_seen = datetime.utcnow()
+        db.add(current_user)
+        db.commit()
+        db.refresh(current_user)
+    except Exception:
+        db.rollback()
     return {
         "email": current_user.email,
         "full_name": current_user.full_name,
@@ -442,6 +452,7 @@ def get_current_user_info(current_user: User = Depends(get_current_user)):
         "company": current_user.company,
         "website": current_user.website,
         "bio": current_user.bio,
+        "last_seen": current_user.last_seen.isoformat() if current_user.last_seen else None,
     }
 
 
@@ -462,13 +473,18 @@ def promote_user_to_admin(
 
 @router.get("/users")
 def get_all_users(current_user: User = Depends(get_current_admin_user), db: Session = Depends(get_db)):
-    users = db.query(User).all()
+    superadmin_email = os.getenv("SUPERADMIN_EMAIL")
+    query = db.query(User)
+    if superadmin_email:
+        query = query.filter(User.email != superadmin_email)
+    users = query.all()
     return [
         {
             "id": user.id,
             "email": user.email,
             "full_name": user.full_name,
-            "is_admin": user.is_admin
+            "is_admin": user.is_admin,
+            "last_seen": getattr(user, "last_seen", None).isoformat() if getattr(user, "last_seen", None) else None,
         }
         for user in users
     ]
@@ -482,6 +498,12 @@ def delete_user_permanently(
 ):
     if current_user.id == user_id:
         raise HTTPException(status_code=400, detail="Cannot delete your own account")
+
+    superadmin_email = os.getenv("SUPERADMIN_EMAIL")
+    if superadmin_email:
+        superadmin = db.query(User).filter(User.email == superadmin_email).first()
+        if superadmin and superadmin.id == user_id:
+            raise HTTPException(status_code=403, detail="Cannot delete system administrator")
 
     user = db.query(User).filter(User.id == user_id).first()
     if not user:

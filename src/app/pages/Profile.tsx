@@ -61,10 +61,10 @@ export default function ProfilePage() {
   }, [refreshUser]);
 
   useEffect(() => {
-    if (showAdminModal) {
+    if (user?.is_admin) {
       fetchAdminUsers();
     }
-  }, [showAdminModal]);
+  }, [user?.is_admin]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -168,7 +168,10 @@ export default function ProfilePage() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/auth/users`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error("Failed to load users");
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Failed to load users");
+      }
       const data = await res.json();
       setAdminUsers(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -398,17 +401,16 @@ export default function ProfilePage() {
             <div className="flex min-h-full items-start justify-center px-4 pt-16 pb-10">
               <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl border border-slate-200 max-h-[90vh] overflow-hidden">
                 <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-lg font-bold text-slate-900">Create User</h2>
-                  <p className="text-xs text-slate-500">Admin only</p>
-                </div>
-                <button
-                  onClick={() => setShowAdminModal(false)}
-                  className="text-xs text-slate-500 hover:text-slate-700"
-                >
-                  Close
-                </button>
-              </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900">Create User</h2>
+                    <p className="text-xs text-slate-500">Admin only</p>
+                  </div>
+                  <button
+                    onClick={() => setShowAdminModal(false)}
+                    className="text-xs text-slate-500 hover:text-slate-700"
+                  >
+                    Close
+                  </button>
                 </div>
                 <div className="space-y-4 overflow-y-auto pr-1 max-h-[78vh]">
                   {adminMessage && (
@@ -417,140 +419,151 @@ export default function ProfilePage() {
                     </div>
                   )}
                   <form onSubmit={handleAdminCreate} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Email</label>
-                  <input
-                    type="email"
-                    value={adminForm.email}
-                    onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
-                    required
-                  />
-                </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Email</label>
+                      <input
+                        type="email"
+                        value={adminForm.email}
+                        onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                        required
+                      />
+                    </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Full Name</label>
-                  <input
-                    type="text"
-                    value={adminForm.full_name}
-                    onChange={(e) => setAdminForm({ ...adminForm, full_name: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
-                  />
-                </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Full Name</label>
+                      <input
+                        type="text"
+                        value={adminForm.full_name}
+                        onChange={(e) => setAdminForm({ ...adminForm, full_name: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                      />
+                    </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Phone (SMS)</label>
-                  <input
-                    type="tel"
-                    value={adminForm.phone}
-                    onChange={(e) => setAdminForm({ ...adminForm, phone: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
-                  />
-                </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Phone (SMS)</label>
+                      <input
+                        type="tel"
+                        value={adminForm.phone}
+                        onChange={(e) => setAdminForm({ ...adminForm, phone: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                      />
+                    </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Role</label>
-                  <select
-                    value={adminForm.role}
-                    onChange={(e) => setAdminForm({ ...adminForm, role: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
-                  >
-                    <option value="user">User</option>
-                    <option value="admin">Administrator</option>
-                  </select>
-                </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Role</label>
+                      <select
+                        value={adminForm.role}
+                        onChange={(e) => setAdminForm({ ...adminForm, role: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                      >
+                        <option value="user">User</option>
+                        <option value="admin">Administrator</option>
+                      </select>
+                    </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Temporary Password (optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={adminForm.temp_password}
-                    onChange={(e) => setAdminForm({ ...adminForm, temp_password: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
-                  />
-                </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">
+                        Temporary Password (optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={adminForm.temp_password}
+                        onChange={(e) => setAdminForm({ ...adminForm, temp_password: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                      />
+                    </div>
 
-                <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs text-slate-600">
-                  <input
-                    type="checkbox"
-                    checked={adminForm.send_link}
-                    onChange={(e) => setAdminForm({ ...adminForm, send_link: e.target.checked })}
-                  />
-                  Send password setup link via email
-                </label>
-                <p className="text-[11px] text-slate-500">
-                  If you set a temporary password, the user can still reset via the email link.
-                </p>
+                    <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={adminForm.send_link}
+                        onChange={(e) => setAdminForm({ ...adminForm, send_link: e.target.checked })}
+                      />
+                      Send password setup link via email
+                    </label>
+                    <p className="text-[11px] text-slate-500">
+                      If you set a temporary password, the user can still reset via the email link.
+                    </p>
 
-                <button
-                  type="submit"
-                  disabled={adminLoading}
-                  className="w-full rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 py-2.5 px-3 text-white font-semibold shadow hover:opacity-90 disabled:opacity-70 flex items-center justify-center gap-2 text-sm cursor-pointer"
-                >
-                  {adminLoading && <LoadingSpinner size={16} variant="light" />}
-                  Create User
-                </button>
+                    <button
+                      type="submit"
+                      disabled={adminLoading}
+                      className="w-full rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 py-2.5 px-3 text-white font-semibold shadow hover:opacity-90 disabled:opacity-70 flex items-center justify-center gap-2 text-sm cursor-pointer"
+                    >
+                      {adminLoading && <LoadingSpinner size={16} variant="light" />}
+                      Create User
+                    </button>
                   </form>
 
-              <div className="mt-6 border-t border-slate-200 pt-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-slate-800">Manage Users</h3>
-                  <button
-                    onClick={fetchAdminUsers}
-                    className="text-xs text-slate-500 hover:text-slate-700"
-                  >
-                    Refresh
-                  </button>
-                </div>
-                {usersLoading && (
-                  <p className="mt-2 text-xs text-slate-500">Loading users...</p>
-                )}
-                {usersError && <p className="mt-2 text-xs text-red-600">{usersError}</p>}
-                <div className="mt-3 max-h-56 space-y-2 overflow-auto">
-                  {adminUsers.map((u) => (
-                    <div
-                      key={u.id}
-                      className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
-                    >
-                      <div>
-                        <p className="font-semibold text-slate-800">{u.full_name || "User"}</p>
-                        <p className="text-slate-500">{u.email}</p>
-                      </div>
-                      <div className="relative">
-                        <button
-                          onClick={() => setOpenUserMenu(openUserMenu === u.id ? null : u.id)}
-                          className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 hover:text-slate-800"
-                        >
-                          •••
-                        </button>
-                        {openUserMenu === u.id && (
-                          <div className="absolute right-0 mt-2 w-40 rounded-lg border border-slate-200 bg-white p-2 shadow-lg z-10">
-                            <div className="px-2 py-1 text-[11px] text-slate-500">
-                              Status: Online
-                            </div>
-                            <button
-                              onClick={() => handleDeleteUser(u.id)}
-                              className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-xs text-red-600 hover:bg-red-50"
-                            >
-                              <span>Delete</span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  {adminUsers.length === 0 && !usersLoading && (
-                    <p className="text-xs text-slate-500">No users found.</p>
-                  )}
-                </div>
-              </div>
+                  <div className="text-[11px] text-slate-500">
+                    Use the Manage Users section below to delete or review user status.
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         )}
+      {user?.is_admin && (
+        <div className="max-w-4xl mx-auto mt-4 rounded-2xl bg-white p-4 shadow-lg">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-slate-900">Manage Users</h2>
+            <button
+              onClick={fetchAdminUsers}
+              className="text-xs text-slate-500 hover:text-slate-700"
+            >
+              Refresh
+            </button>
+          </div>
+          {usersLoading && <p className="text-xs text-slate-500">Loading users...</p>}
+          {usersError && <p className="text-xs text-red-600">{usersError}</p>}
+          <div className="mt-2 max-h-72 space-y-2 overflow-auto">
+            {adminUsers
+              .filter((u) => u.email !== user?.email)
+              .map((u) => (
+              <div
+                key={u.id}
+                className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+              >
+                <div>
+                  <p className="font-semibold text-slate-800">{u.full_name || "User"}</p>
+                  <p className="text-slate-500">{u.email}</p>
+                </div>
+                <div className="relative">
+                  <button
+                    onClick={() => setOpenUserMenu(openUserMenu === u.id ? null : u.id)}
+                    className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 hover:text-slate-800"
+                  >
+                    ...
+                  </button>
+                  {openUserMenu === u.id && (
+                    <div className="absolute right-0 mt-2 w-44 rounded-lg border border-slate-200 bg-white p-2 shadow-lg z-10">
+                      <div className="px-2 py-1 text-[11px] text-slate-500">
+                        Status: {u.last_seen && new Date(u.last_seen).getTime() > Date.now() - 5 * 60 * 1000 ? "Online" : "Offline"}
+                      </div>
+                      {u.last_seen && (
+                        <div className="px-2 py-1 text-[10px] text-slate-400">
+                          Last seen: {new Date(u.last_seen).toLocaleString()}
+                        </div>
+                      )}
+                      <button
+                        onClick={() => handleDeleteUser(u.id)}
+                        className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                      >
+                        <span>Delete</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+            {adminUsers.filter((u) => u.email !== user?.email).length === 0 && !usersLoading && (
+              <p className="text-xs text-slate-500">No users found.</p>
+            )}
+          </div>
+        </div>
+      )}
+
       </div>
     </div>
   );
