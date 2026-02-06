@@ -353,8 +353,11 @@ async def check_invoices(payload: WorkdriveCheckRequest):
             ]
         )
         email_message = "".join(parts)
-        await send_email([recipient_email], email_subject, email_message)
-        email_sent = True
+        try:
+            await send_email([recipient_email], email_subject, email_message)
+            email_sent = True
+        except Exception:
+            logger.exception("Failed to send WorkDrive report email")
 
     return {
         "success": True,

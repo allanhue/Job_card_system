@@ -21,6 +21,7 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
   const navItems = [
     ...(user?.is_admin ? [{ name: "Dashboard", key: "home" }] : []),
     { name: "Invoices", key: "invoices" },
+    { name: "WorkDrive", key: "workdrive", icon: "folder" },
     { name: "Profile", key: "profile" },
   ];
 
@@ -96,12 +97,27 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
               <button
                 key={item.key}
                 onClick={() => onNavigate(item.key)}
-                className={`relative text-xs sm:text-sm font-medium transition-all py-1 px-2 rounded-md ${
+                className={`relative flex items-center gap-1.5 text-xs sm:text-sm font-medium transition-all py-1 px-2 rounded-md ${
                   currentPage === item.key
                     ? "text-[var(--accent-primary)] bg-orange-50"
                     : "text-[var(--foreground-muted)] hover:text-[var(--accent-primary)] hover:bg-gray-50"
                 }`}
               >
+                {item.icon === "folder" && (
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M3 7a2 2 0 012-2h5l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"
+                    />
+                  </svg>
+                )}
                 {item.name}
                 {currentPage === item.key && (
                   <span className="absolute bottom-0 left-0 right-0 mx-auto h-0.5 w-3/4 rounded-full bg-gradient-to-r from-[var(--accent-primary)] to-[var(--accent-secondary)]" />
@@ -146,12 +162,27 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
               <button
                 key={item.key}
                 onClick={() => onNavigate(item.key)}
-                className={`block w-full text-left px-3 py-2 text-sm font-medium rounded-md transition-all ${
+                className={`flex w-full items-center gap-2 text-left px-3 py-2 text-sm font-medium rounded-md transition-all ${
                   currentPage === item.key
                     ? "bg-orange-50 text-orange-600 border-l-4 border-orange-500"
                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 }`}
               >
+                {item.icon === "folder" && (
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M3 7a2 2 0 012-2h5l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"
+                    />
+                  </svg>
+                )}
                 {item.name}
               </button>
             ))}
@@ -165,7 +196,10 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
               >
                 Logout
               </button>
-              <button className="block w-full text-left px-3 py-2 text-sm font-medium bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-md mt-1">
+              <button
+                onClick={() => setShowPicker(true)}
+                className="block w-full text-left px-3 py-2 text-sm font-medium bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-md mt-1"
+              >
                 Create Job
               </button>
             </div>
@@ -174,43 +208,56 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
       </div>
 
       {showPicker && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 px-4 pt-24 pb-6">
-          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl border border-slate-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-8">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl border border-slate-200">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-base font-semibold text-slate-900">Select Invoice</h3>
-                <p className="text-xs text-slate-500">Choose which invoice to apply a job card</p>
+                <h3 className="text-base font-semibold text-slate-900">Create Job Card</h3>
+                <p className="text-xs text-slate-500">Pick an invoice to start</p>
               </div>
               <button
                 onClick={() => setShowPicker(false)}
-                className="text-xs text-slate-500 hover:text-slate-700"
+                className="rounded-full border border-slate-200 px-2 py-1 text-xs text-slate-500 hover:text-slate-700"
               >
                 Close
               </button>
             </div>
-            {pickerLoading && <p className="text-xs text-slate-500">Loading invoices...</p>}
-            {pickerError && <p className="text-xs text-red-600">{pickerError}</p>}
-            {!pickerLoading && !pickerError && (
-              <select
-                value={selectedInvoiceId}
-                onChange={(e) => setSelectedInvoiceId(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-slate-50 focus:border-orange-500 focus:outline-none"
-              >
-                <option value="">Choose invoice...</option>
-                {invoiceOptions.map((inv) => (
-                  <option key={inv.id} value={inv.id}>
-                    {inv.invoice_number} - {inv.client_name}
-                  </option>
-                ))}
-              </select>
-            )}
-            <button
-              onClick={handleOpenJob}
-              disabled={!selectedInvoiceId}
-              className="mt-4 w-full rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 text-white py-2 text-sm font-semibold disabled:opacity-50"
-            >
-              Open Job Card
-            </button>
+            <div className="space-y-3">
+              {pickerLoading && <p className="text-xs text-slate-500">Loading invoices...</p>}
+              {pickerError && <p className="text-xs text-red-600">{pickerError}</p>}
+              {!pickerLoading && !pickerError && (
+                <select
+                  value={selectedInvoiceId}
+                  onChange={(e) => setSelectedInvoiceId(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-slate-50 focus:border-orange-500 focus:outline-none"
+                >
+                  <option value="">Choose invoice...</option>
+                  {invoiceOptions.map((inv) => (
+                    <option key={inv.id} value={inv.id}>
+                      {inv.invoice_number} - {inv.client_name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button
+                  onClick={() => setShowPicker(false)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleOpenJob}
+                  disabled={!selectedInvoiceId}
+                  className="w-full rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 text-white py-2 text-xs font-semibold disabled:opacity-50"
+                >
+                  Open Job Card
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                You can also open an invoice from the invoice list.
+              </p>
+            </div>
           </div>
         </div>
       )}

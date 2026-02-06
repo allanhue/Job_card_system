@@ -23,6 +23,7 @@ interface ActivityLog {
   handler: string;
   invoice_number: string;
   timestamp: string;
+  raw_timestamp: string;
   status?: string;
   hours?: number;
   email?: string;
@@ -47,6 +48,7 @@ export default function Home() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [activeLog, setActiveLog] = useState<ActivityLog | null>(null);
 
   const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
@@ -119,6 +121,7 @@ export default function Home() {
               "Unknown",
             invoice_number: jc.invoice_number || "N/A",
             timestamp: formatTimeAgo(jc.created_at),
+            raw_timestamp: jc.updated_at || jc.created_at || "",
             status: jc.status,
             email: jc.email,
             hours: hours || undefined,
@@ -167,6 +170,18 @@ export default function Home() {
     if (hours < 24) return `${hours}h ago`;
     const days = Math.floor(hours / 24);
     return `${days}d ago`;
+  };
+
+  const formatDateTime = (dateString: string) => {
+    if (!dateString) return "Unknown";
+    const date = new Date(dateString);
+    return date.toLocaleString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   // Handler distribution
@@ -460,7 +475,8 @@ export default function Home() {
         {activityLogs.map((log) => (
           <div
             key={log.id}
-            className="flex items-start gap-4 rounded-xl border border-slate-100 bg-slate-50 p-4 transition hover:bg-slate-100"
+            className="flex items-start gap-4 rounded-xl border border-slate-100 bg-slate-50 p-4 transition hover:bg-slate-100 cursor-pointer"
+            onClick={() => setActiveLog(log)}
           >
             <div
               className={`h-10 w-10 flex items-center justify-center rounded-full ${
@@ -491,6 +507,7 @@ export default function Home() {
                 {log.status && (
                   <span className="rounded-full bg-slate-200 px-2 py-1">{log.status}</span>
                 )}
+                <span className="rounded-full bg-slate-200 px-2 py-1">{log.timestamp}</span>
                 {log.hours && (
                   <span className="rounded-full bg-slate-200 px-2 py-1">{log.hours}h</span>
                 )}
@@ -499,7 +516,7 @@ export default function Home() {
                 )}
               </div>
             </div>
-            <span className="text-xs text-slate-400">{log.timestamp}</span>
+            <span className="text-xs text-slate-400">{formatDateTime(log.raw_timestamp)}</span>
           </div>
         ))}
       </div>
@@ -670,6 +687,51 @@ export default function Home() {
         )}
 
         <ActivityLogs />
+
+        {activeLog && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl border border-slate-200">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h4 className="text-lg font-semibold text-slate-900">Activity Detail</h4>
+                  <p className="text-xs text-slate-500">{formatDateTime(activeLog.raw_timestamp)}</p>
+                </div>
+                <button
+                  onClick={() => setActiveLog(null)}
+                  className="text-xs text-slate-500 hover:text-slate-700"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="space-y-3 text-sm text-slate-700">
+                <div>
+                  <p className="text-xs uppercase text-slate-400">Handler</p>
+                  <p className="font-semibold text-slate-900">{activeLog.handler}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-slate-400">Invoice</p>
+                  <p className="font-semibold text-slate-900">{activeLog.invoice_number}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {activeLog.status && (
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs">{activeLog.status}</span>
+                  )}
+                  {activeLog.hours && (
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs">
+                      {activeLog.hours}h logged
+                    </span>
+                  )}
+                  {activeLog.email && (
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs">{activeLog.email}</span>
+                  )}
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs">
+                    {activeLog.timestamp}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -409,7 +409,12 @@ def get_current_user_info(current_user: User = Depends(get_current_user)):
         "email": current_user.email,
         "full_name": current_user.full_name,
         "is_admin": current_user.is_admin,
-        "role": "admin" if current_user.is_admin else "user"
+        "role": "admin" if current_user.is_admin else "user",
+        "phone": current_user.phone,
+        "address": current_user.address,
+        "company": current_user.company,
+        "website": current_user.website,
+        "bio": current_user.bio,
     }
 
 

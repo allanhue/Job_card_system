@@ -26,6 +26,16 @@ export default function ProfilePage() {
     temp_password: "",
     send_link: true,
   });
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  const [adminMessage, setAdminMessage] = useState("");
+
+  const getInitials = (name: string) =>
+    name
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join("") || "U";
 
   useEffect(() => {
     if (user) {
@@ -60,16 +70,29 @@ export default function ProfilePage() {
       });
 
       if (response.ok) {
-        await response.json();
+        const data = await response.json();
+        if (data?.user) {
+          setProfileData({
+            full_name: data.user.full_name || "",
+            phone: data.user.phone || "",
+            address: data.user.address || "",
+            company: data.user.company || "",
+            bio: data.user.bio || "",
+          });
+        }
         await refreshUser();
-        setMessage("Profile updated successfully!");
+        pushToast("success", "Profile updated successfully");
+        setMessage("Profile updated successfully");
         setIsEditing(false);
       } else {
         const error = await response.json();
-        setMessage(error.detail || "Failed to update profile");
+        const msg = error.detail || "Failed to update profile";
+        setMessage(msg);
+        pushToast("error", msg);
       }
     } catch (error) {
       setMessage("Error updating profile");
+      pushToast("error", "Error updating profile");
     } finally {
       setLoading(false);
     }
@@ -85,6 +108,7 @@ export default function ProfilePage() {
   const handleAdminCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setAdminLoading(true);
+    setAdminMessage("");
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/auth/admin/create-user`, {
@@ -103,6 +127,7 @@ export default function ProfilePage() {
       });
       if (!response.ok) throw new Error("Failed to create user");
       pushToast("success", "User created or updated successfully");
+      setAdminMessage("User created or updated successfully.");
       setAdminForm({
         email: "",
         full_name: "",
@@ -111,7 +136,9 @@ export default function ProfilePage() {
         send_link: true,
       });
     } catch (err) {
-      pushToast("error", err instanceof Error ? err.message : "Failed to create user");
+      const msg = err instanceof Error ? err.message : "Failed to create user";
+      pushToast("error", msg);
+      setAdminMessage(msg);
     } finally {
       setAdminLoading(false);
     }
@@ -131,7 +158,7 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-slate-50 p-3 sm:p-4">
       <div className="max-w-4xl mx-auto space-y-4">
         <div className="bg-white rounded-2xl shadow-lg p-3 sm:p-4">
-          <div className="flex justify-between items-center mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
             <h1 className="text-xl font-bold text-slate-900">Profile</h1>
             <div className="flex gap-4">
               {isEditing ? (
@@ -145,7 +172,7 @@ export default function ProfilePage() {
                   <button
                     onClick={handleSubmit}
                     disabled={loading}
-                    className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm"
+                    className="px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 text-sm"
                   >
                     {loading ? "Saving..." : "Save"}
                   </button>
@@ -154,16 +181,24 @@ export default function ProfilePage() {
                 <>
                   <button
                     onClick={() => setIsEditing(true)}
-                    className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                    className="px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm"
                   >
                     Edit Profile
                   </button>
-                  <button
+                  {user.is_admin && (
+                    <button
+                      onClick={() => setShowAdminModal(true)}
+                      className="px-3 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 text-sm"
+                    >
+                      Create User
+                    </button>
+                  )}
+                  {/* <button
                     onClick={logout}
                     className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"
                   >
                     Logout
-                  </button>
+                  </button> */}
                 </>
               )}
             </div>
@@ -178,6 +213,30 @@ export default function ProfilePage() {
           )}
 
           <div className="space-y-6">
+            <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="relative h-14 w-14 overflow-hidden rounded-full bg-gradient-to-br from-slate-900 to-slate-600 text-white flex items-center justify-center text-lg font-semibold">
+                {getInitials(user.full_name || user.email)}
+                <div className="absolute bottom-0 right-0 rounded-full bg-white p-1 shadow">
+                  <svg
+                    className="h-3.5 w-3.5 text-slate-700"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M16 14a4 4 0 10-8 0m8 0a4 4 0 01-8 0m8 0v1a2 2 0 01-2 2H10a2 2 0 01-2-2v-1"
+                    />
+                  </svg>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-900">{user.full_name || "User"}</p>
+                <p className="text-xs text-slate-500">{user.email}</p>
+              </div>
+            </div>
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Email</label>
               <p className="text-base text-slate-900">{user.email}</p>
@@ -284,78 +343,91 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {user.is_admin && (
-          <div className="bg-white rounded-2xl shadow-lg p-3 sm:p-4">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-xl font-bold text-slate-900">Admin: Create User</h2>
-              </div>
-              <span className="inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-600">
-                Admin Only
-              </span>
-            </div>
-            <form onSubmit={handleAdminCreate} className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Email</label>
-                <input
-                  type="email"
-                  value={adminForm.email}
-                  onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })}
-                  className="w-full max-w-sm rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Full Name</label>
-                <input
-                  type="text"
-                  value={adminForm.full_name}
-                  onChange={(e) => setAdminForm({ ...adminForm, full_name: e.target.value })}
-                  className="w-full max-w-sm rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Role</label>
-                <select
-                  value={adminForm.role}
-                  onChange={(e) => setAdminForm({ ...adminForm, role: e.target.value })}
-                  className="w-full max-w-sm rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+        {user.is_admin && showAdminModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl border border-slate-200">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">Create User</h2>
+                  <p className="text-xs text-slate-500">Admin only</p>
+                </div>
+                <button
+                  onClick={() => setShowAdminModal(false)}
+                  className="text-xs text-slate-500 hover:text-slate-700"
                 >
-                  <option value="user">User</option>
-                  <option value="admin">Administrator</option>
-                </select>
+                  Close
+                </button>
               </div>
+              {adminMessage && (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                  {adminMessage}
+                </div>
+              )}
+              <form onSubmit={handleAdminCreate} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={adminForm.email}
+                    onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })}
+                    className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                    required
+                  />
+                </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Temporary Password (optional)</label>
-                <input
-                  type="text"
-                  value={adminForm.temp_password}
-                  onChange={(e) => setAdminForm({ ...adminForm, temp_password: e.target.value })}
-                  className="w-full max-w-sm rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
-                />
-              </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    value={adminForm.full_name}
+                    onChange={(e) => setAdminForm({ ...adminForm, full_name: e.target.value })}
+                    className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                  />
+                </div>
 
-              <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs text-slate-600 max-w-sm">
-                <input
-                  type="checkbox"
-                  checked={adminForm.send_link}
-                  onChange={(e) => setAdminForm({ ...adminForm, send_link: e.target.checked })}
-                />
-                Send password setup link via email
-              </label>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Role</label>
+                  <select
+                    value={adminForm.role}
+                    onChange={(e) => setAdminForm({ ...adminForm, role: e.target.value })}
+                    className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                  >
+                    <option value="user">User</option>
+                    <option value="admin">Administrator</option>
+                  </select>
+                </div>
 
-              <button
-                type="submit"
-                disabled={adminLoading}
-                className="max-w-sm rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 py-2.5 px-3 text-white font-semibold shadow hover:opacity-90 disabled:opacity-70 flex items-center justify-center gap-2 text-sm cursor-pointer"
-              >
-                {adminLoading && <LoadingSpinner size={16} variant="light" />}
-                Create User
-              </button>
-            </form>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">
+                    Temporary Password (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={adminForm.temp_password}
+                    onChange={(e) => setAdminForm({ ...adminForm, temp_password: e.target.value })}
+                    className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                  />
+                </div>
+
+                <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={adminForm.send_link}
+                    onChange={(e) => setAdminForm({ ...adminForm, send_link: e.target.checked })}
+                  />
+                  Send password setup link via email
+                </label>
+
+                <button
+                  type="submit"
+                  disabled={adminLoading}
+                  className="w-full rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 py-2.5 px-3 text-white font-semibold shadow hover:opacity-90 disabled:opacity-70 flex items-center justify-center gap-2 text-sm cursor-pointer"
+                >
+                  {adminLoading && <LoadingSpinner size={16} variant="light" />}
+                  Create User
+                </button>
+              </form>
+            </div>
           </div>
         )}
       </div>

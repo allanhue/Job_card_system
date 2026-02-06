@@ -203,27 +203,30 @@ async def create_job_card(
     db.refresh(job_card)
 
     if email and (notify_email is None or notify_email):
-        backend_url = os.getenv("BACKEND_URL", "http://localhost:8000")
-        attachment_lines = ""
-        if attachments:
-            links = []
-            for a in attachments:
-                link = a["path"].replace("back/", "")
-                links.append(f"<li>{a['filename']} - {backend_url}/{link}</li>")
-            attachment_lines = f"<p><strong>Attachments:</strong></p><ul>{''.join(links)}</ul>"
-        voice_line = ""
-        if voice_path:
-            voice_link = voice_path.replace("back/", "")
-            voice_line = f"<p><strong>Voice Note:</strong> {backend_url}/{voice_link}</p>"
-        subject = f"Job Card Created: {job_card.job_card_number}"
-        body = (
-            f"<p>Your job card has been created.</p>"
-            f"<p><strong>Job Card:</strong> {job_card.job_card_number}</p>"
-            f"<p><strong>Invoice:</strong> {job_card.invoice_number}</p>"
-            f"<p><strong>Status:</strong> {job_card.status}</p>"
-            f"{attachment_lines}{voice_line}"
-        )
-        await send_email([email], subject, body)
+        try:
+            backend_url = os.getenv("BACKEND_URL", "http://localhost:8000")
+            attachment_lines = ""
+            if attachments:
+                links = []
+                for a in attachments:
+                    link = a["path"].replace("back/", "")
+                    links.append(f"<li>{a['filename']} - {backend_url}/{link}</li>")
+                attachment_lines = f"<p><strong>Attachments:</strong></p><ul>{''.join(links)}</ul>"
+            voice_line = ""
+            if voice_path:
+                voice_link = voice_path.replace("back/", "")
+                voice_line = f"<p><strong>Voice Note:</strong> {backend_url}/{voice_link}</p>"
+            subject = f"Job Card Created: {job_card.job_card_number}"
+            body = (
+                f"<p>Your job card has been created.</p>"
+                f"<p><strong>Job Card:</strong> {job_card.job_card_number}</p>"
+                f"<p><strong>Invoice:</strong> {job_card.invoice_number}</p>"
+                f"<p><strong>Status:</strong> {job_card.status}</p>"
+                f"{attachment_lines}{voice_line}"
+            )
+            await send_email([email], subject, body)
+        except Exception as e:
+            logger.exception("Failed to send job card email")
 
     return job_card
 

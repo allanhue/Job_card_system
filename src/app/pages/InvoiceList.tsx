@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import LoadingSpinner from "../components/LoadingSpinner";
 import { useSearchParams } from "next/navigation";
 import JobCardModal from "./Invoice_lay";
 
@@ -191,12 +192,9 @@ export default function InvoiceList({
   if (loading)
     return (
       <div className="min-h-screen bg-[var(--background)] px-3 py-4 sm:px-4 sm:py-6 lg:px-8">
-        <div className="mx-auto max-w-7xl">
-          <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-24 sm:h-28 animate-pulse rounded-lg bg-[var(--background-elevated)]" />
-            ))}
-          </div>
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-center gap-3 py-10 text-[var(--foreground-muted)]">
+          <LoadingSpinner size={22} />
+          <span className="text-sm">Loading invoices...</span>
         </div>
       </div>
     );
@@ -216,18 +214,22 @@ export default function InvoiceList({
     <div className="min-h-screen bg-[var(--background)] px-4 py-8 sm:px-6 lg:px-8 text-[var(--foreground)]">
       <div className="mx-auto max-w-7xl space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold text-[var(--foreground)]">Invoices</h1>
-            <p className="mt-2 text-[var(--foreground-muted)]">Manage and apply for job cards</p>
-          </div>
+        <div className="flex items-center justify-end">
           <div className="flex items-center gap-2">
+            {loading && <LoadingSpinner size={18} />}
             <button
               onClick={syncZohoInvoices}
               disabled={syncing}
               className="btn border border-[var(--accent-primary)]/40 bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/20 disabled:opacity-50"
             >
-              {syncing ? "Syncing..." : "Sync Zoho"}
+              {syncing ? (
+                <span className="flex items-center gap-2">
+                  <LoadingSpinner size={14} />
+                  Syncing...
+                </span>
+              ) : (
+                "Sync Zoho"
+              )}
             </button>
             <button className="btn btn-primary">New Invoice</button>
           </div>

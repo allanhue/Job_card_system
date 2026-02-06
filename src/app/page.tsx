@@ -12,6 +12,7 @@ import LoadingSpinner from "./components/LoadingSpinner";
 const Home = dynamic(() => import("./pages/Home"), { ssr: false });
 const InvoiceList = dynamic(() => import("./pages/InvoiceList"), { ssr: false });
 const Profile = dynamic(() => import("./pages/Profile"), { ssr: false });
+const WorkdriveInvoice = dynamic(() => import("./pages/workdrive_invoice"), { ssr: false });
 
 export default function Page() {
   return (
@@ -90,6 +91,7 @@ function PageContent() {
           <InvoiceList initialStatus={statusParam} initialView={viewParam} />
         )}
         {effectivePage === "profile" && <Profile />}
+        {effectivePage === "workdrive" && <WorkdriveInvoice />}
         {effectivePage === "login" && <Login />}
         {effectivePage === "forgot" && <PasswordRecovery />}
         {effectivePage === "reset" && <PasswordRecovery />}
