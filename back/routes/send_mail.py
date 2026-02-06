@@ -23,6 +23,8 @@ async def send_email(recipients: list[str], subject: str, body: str):
         raise HTTPException(status_code=500, detail="MAIL_PASSWORD (Brevo API key) not set")
     if not MAIL_FROM:
         raise HTTPException(status_code=500, detail="MAIL_FROM not set")
+    if not recipients:
+        raise HTTPException(status_code=400, detail="No recipients provided")
 
     payload = {
         "sender": {"name": MAIL_FROM_NAME, "email": MAIL_FROM},
@@ -43,6 +45,7 @@ async def send_email(recipients: list[str], subject: str, body: str):
         )
         if response.status_code >= 400:
             raise HTTPException(status_code=500, detail=f"Email failed: {response.text}")
+        return True
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=500, detail=f"Email failed: {str(e)}")
 

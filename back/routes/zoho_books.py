@@ -260,7 +260,7 @@ def health_check():
 
 @router.get("/invoices")
 def get_invoices(status: Optional[str] = "all"):
-    """Get list of invoices"""
+    #get invoices
     try:
         logger.info(f"Fetching invoices with status: {status}")
         
@@ -295,7 +295,7 @@ def get_invoices(status: Optional[str] = "all"):
 
 @router.get("/invoices/{invoice_id}")
 def get_invoice_by_id(invoice_id: str):
-    """Get a specific invoice by ID"""
+    #Get a specific invoice by ID
     try:
         logger.info(f"Fetching invoice: {invoice_id}")
         
