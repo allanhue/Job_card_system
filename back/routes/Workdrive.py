@@ -310,36 +310,49 @@ async def check_invoices(payload: WorkdriveCheckRequest):
         if date_from or date_to:
             range_label = f"{date_from or '...'} to {date_to or '...'}"
         email_subject = f"Twatitara ETR Parser Check - {selected_statuses} ({api_currency_code})"
-        email_message = (
-            "<html><body style='font-family: Arial; background: #f6f8fb; padding: 16px;'>"
-            "<div style='max-width: 700px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;'>"
-            "<div style='background: linear-gradient(90deg, #1d4ed8, #0ea5e9); color: white; padding: 20px;'>"
-            "<h2 style='margin: 0; font-size: 20px;'>ETR WorkDrive Report</h2>"
-            f"<p style='margin: 6px 0 0; font-size: 12px;'>Generated {datetime.now().strftime('%d-%b-%Y %H:%M')}</p>"
-            "</div>"
-            "<div style='padding: 20px;'>"
-            f"<p style='margin: 0 0 6px;'><strong>Filter:</strong> {selected_statuses} ({api_currency_code or 'ALL'})</p>"
-            + (f"<p style='margin: 0 0 12px;'><strong>Date range:</strong> {range_label}</p>" if range_label else "")
-            "<div style='display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px;'>"
-            f"<div style='flex: 1; min-width: 140px; background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px;'><div style='font-size: 12px; color: #64748b;'>Books Invoices</div><div style='font-size: 18px; font-weight: 700;'>{len(invoice_numbers)}</div></div>"
-            f"<div style='flex: 1; min-width: 140px; background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px;'><div style='font-size: 12px; color: #64748b;'>WorkDrive Files</div><div style='font-size: 18px; font-weight: 700;'>{len(file_invoice_numbers)}</div></div>"
-            f"<div style='flex: 1; min-width: 140px; background: #ecfdf5; border: 1px solid #bbf7d0; padding: 12px; border-radius: 8px;'><div style='font-size: 12px; color: #166534;'>Matched</div><div style='font-size: 18px; font-weight: 700; color: #166534;'>{matched_count}</div></div>"
-            f"<div style='flex: 1; min-width: 140px; background: #fef2f2; border: 1px solid #fecaca; padding: 12px; border-radius: 8px;'><div style='font-size: 12px; color: #991b1b;'>Missing</div><div style='font-size: 18px; font-weight: 700; color: #991b1b;'>{missing_count}</div></div>"
-            "</div>"
-            "<h3 style='margin: 0 0 8px; font-size: 16px;'>Missing Invoices</h3>"
-            + (
-                "<ul style='padding-left: 18px; margin: 0;'>"
-                + "".join([f"<li style='margin: 2px 0;'>{inv}</li>" for inv in missing_list[:40]])
-                + ("<li>... more omitted</li>" if missing_count > 40 else "")
-                + "</ul>"
-                if missing_count > 0
-                else "<p style='margin: 0; color: #16a34a;'>None</p>"
+        parts = [
+            "<html><body style='font-family: Arial; background: #f6f8fb; padding: 16px;'>",
+            "<div style='max-width: 700px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;'>",
+            "<div style='background: linear-gradient(90deg, #1d4ed8, #0ea5e9); color: white; padding: 20px;'>",
+            "<h2 style='margin: 0; font-size: 20px;'>ETR WorkDrive Report</h2>",
+            f"<p style='margin: 6px 0 0; font-size: 12px;'>Generated {datetime.now().strftime('%d-%b-%Y %H:%M')}</p>",
+            "</div>",
+            "<div style='padding: 20px;'>",
+            f"<p style='margin: 0 0 6px;'><strong>Filter:</strong> {selected_statuses} ({api_currency_code or 'ALL'})</p>",
+        ]
+        if range_label:
+            parts.append(
+                f"<p style='margin: 0 0 12px;'><strong>Date range:</strong> {range_label}</p>"
             )
-            + "</div>"
-            "<div style='padding: 12px 20px; background: #f8fafc; font-size: 11px; color: #94a3b8;'>Auto-generated ETR report</div>"
-            "</div>"
-            "</body></html>"
+        parts.extend(
+            [
+                "<div style='display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px;'>",
+                f"<div style='flex: 1; min-width: 140px; background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px;'><div style='font-size: 12px; color: #64748b;'>Books Invoices</div><div style='font-size: 18px; font-weight: 700;'>{len(invoice_numbers)}</div></div>",
+                f"<div style='flex: 1; min-width: 140px; background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px;'><div style='font-size: 12px; color: #64748b;'>WorkDrive Files</div><div style='font-size: 18px; font-weight: 700;'>{len(file_invoice_numbers)}</div></div>",
+                f"<div style='flex: 1; min-width: 140px; background: #ecfdf5; border: 1px solid #bbf7d0; padding: 12px; border-radius: 8px;'><div style='font-size: 12px; color: #166534;'>Matched</div><div style='font-size: 18px; font-weight: 700; color: #166534;'>{matched_count}</div></div>",
+                f"<div style='flex: 1; min-width: 140px; background: #fef2f2; border: 1px solid #fecaca; padding: 12px; border-radius: 8px;'><div style='font-size: 12px; color: #991b1b;'>Missing</div><div style='font-size: 18px; font-weight: 700; color: #991b1b;'>{missing_count}</div></div>",
+                "</div>",
+                "<h3 style='margin: 0 0 8px; font-size: 16px;'>Missing Invoices</h3>",
+            ]
         )
+        if missing_count > 0:
+            missing_items = "".join(
+                [f"<li style='margin: 2px 0;'>{inv}</li>" for inv in missing_list[:40]]
+            )
+            if missing_count > 40:
+                missing_items += "<li>... more omitted</li>"
+            parts.append(f"<ul style='padding-left: 18px; margin: 0;'>{missing_items}</ul>")
+        else:
+            parts.append("<p style='margin: 0; color: #16a34a;'>None</p>")
+        parts.extend(
+            [
+                "</div>",
+                "<div style='padding: 12px 20px; background: #f8fafc; font-size: 11px; color: #94a3b8;'>Auto-generated ETR report</div>",
+                "</div>",
+                "</body></html>",
+            ]
+        )
+        email_message = "".join(parts)
         await send_email([recipient_email], email_subject, email_message)
         email_sent = True
 
