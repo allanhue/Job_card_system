@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from db import get_db
 from routes.auth import get_current_user, User, Invoice, JobCard, ZohoInvoice, Notification
-from routes.send_mail import send_email
+from routes.send_mail import send_email, send_sms
 from datetime import timedelta
 import os
 import json
@@ -247,6 +247,21 @@ async def create_job_card(
             await send_email([email], subject, body)
         except Exception as e:
             logger.exception("Failed to send job card email")
+
+    sms_phone = None
+    if invoice and invoice.client_phone:
+        sms_phone = invoice.client_phone
+    elif zoho_invoice and zoho_invoice.client_phone:
+        sms_phone = zoho_invoice.client_phone
+    elif assigned_user and assigned_user.phone:
+        sms_phone = assigned_user.phone
+
+    if sms_phone and (notify_email is None or notify_email):
+        try:
+            text = f"Job card {job_card.job_card_number} created for invoice {job_card.invoice_number}."
+            await send_sms(sms_phone, text, tag="job-card")
+        except Exception:
+            logger.exception("Failed to send job card SMS")
 
     return job_card
 

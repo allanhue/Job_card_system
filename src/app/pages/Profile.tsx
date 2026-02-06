@@ -22,6 +22,7 @@ export default function ProfilePage() {
   const [adminForm, setAdminForm] = useState({
     email: "",
     full_name: "",
+    phone: "",
     role: "user",
     temp_password: "",
     send_link: true,
@@ -120,6 +121,7 @@ export default function ProfilePage() {
         body: JSON.stringify({
           email: adminForm.email,
           full_name: adminForm.full_name || null,
+          phone: adminForm.phone || null,
           role: adminForm.role,
           temp_password: adminForm.temp_password || null,
           send_link: adminForm.send_link,
@@ -131,6 +133,7 @@ export default function ProfilePage() {
       setAdminForm({
         email: "",
         full_name: "",
+        phone: "",
         role: "user",
         temp_password: "",
         send_link: true,
@@ -381,6 +384,16 @@ export default function ProfilePage() {
                     type="text"
                     value={adminForm.full_name}
                     onChange={(e) => setAdminForm({ ...adminForm, full_name: e.target.value })}
+                    className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Phone (SMS)</label>
+                  <input
+                    type="tel"
+                    value={adminForm.phone}
+                    onChange={(e) => setAdminForm({ ...adminForm, phone: e.target.value })}
                     className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
                   />
                 </div>

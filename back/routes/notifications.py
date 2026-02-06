@@ -11,6 +11,12 @@ router = APIRouter(prefix="/notifications", tags=["Notifications"])
 logger = logging.getLogger(__name__)
 
 
+def cleanup_old_notifications(db: Session, hours: int = 24) -> None:
+    cutoff = datetime.utcnow() - timedelta(hours=hours)
+    db.query(Notification).filter(Notification.created_at < cutoff).delete(synchronize_session=False)
+    db.commit()
+
+
 class NotificationCreate(BaseModel):
     title: str
     message: str
@@ -29,6 +35,9 @@ def create_notification(
     db: Session = Depends(get_db),
 ):
     try:
+        cutoff = datetime.utcnow() - timedelta(hours=24)
+        db.query(Notification).filter(Notification.created_at < cutoff).delete(synchronize_session=False)
+        db.commit()
         created_ids = []
         recipients = []
         if payload.recipient_id:
@@ -84,15 +93,17 @@ def list_notifications(
         return {
             "success": True,
             "data": [
-                {
-                    "id": n.id,
-                    "title": n.title,
-                    "message": n.message,
-                    "category": n.category,
-                    "link": n.link,
-                    "created_at": n.created_at.isoformat() if n.created_at else None,
-                    "read_at": n.read_at.isoformat() if n.read_at else None,
-                }
+            {
+                "id": n.id,
+                "title": n.title,
+                "message": n.message,
+                "category": n.category,
+                "link": n.link,
+                "recipient_id": n.recipient_id,
+                "recipient_email": n.recipient_email,
+                "created_at": n.created_at.isoformat() if n.created_at else None,
+                "read_at": n.read_at.isoformat() if n.read_at else None,
+            }
                 for n in notifications
             ],
         }
@@ -122,15 +133,17 @@ def list_my_notifications(
         return {
             "success": True,
             "data": [
-                {
-                    "id": n.id,
-                    "title": n.title,
-                    "message": n.message,
-                    "category": n.category,
-                    "link": n.link,
-                    "created_at": n.created_at.isoformat() if n.created_at else None,
-                    "read_at": n.read_at.isoformat() if n.read_at else None,
-                }
+            {
+                "id": n.id,
+                "title": n.title,
+                "message": n.message,
+                "category": n.category,
+                "link": n.link,
+                "recipient_id": n.recipient_id,
+                "recipient_email": n.recipient_email,
+                "created_at": n.created_at.isoformat() if n.created_at else None,
+                "read_at": n.read_at.isoformat() if n.read_at else None,
+            }
                 for n in notifications
             ],
         }

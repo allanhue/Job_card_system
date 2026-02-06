@@ -40,6 +40,15 @@ interface JobCardStats {
   top_customers?: { name: string; count: number }[];
 }
 
+interface ThreadMessage {
+  id: number;
+  title: string;
+  message: string;
+  link?: string | null;
+  recipient_email?: string | null;
+  created_at?: string | null;
+}
+
 export default function Home() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
@@ -55,6 +64,7 @@ export default function Home() {
   const [messageTarget, setMessageTarget] = useState<ActivityLog | null>(null);
   const [messageText, setMessageText] = useState("");
   const [messageSending, setMessageSending] = useState(false);
+  const [messageThread, setMessageThread] = useState<ThreadMessage[]>([]);
 
   const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
@@ -178,10 +188,35 @@ export default function Home() {
       setMessageText("");
       setMessageModalOpen(false);
       setMessageTarget(null);
+      setMessageThread([]);
     } catch {
       // noop
     } finally {
       setMessageSending(false);
+    }
+  };
+
+  const fetchMessageThread = async (activityId: string, targetEmail: string | undefined) => {
+    try {
+      const token = localStorage.getItem("token");
+      const endpoint = user?.is_admin ? "/notifications?limit=50" : "/notifications/me?limit=50";
+      const res = await fetch(`${API_URL}${endpoint}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const result = await res.json();
+      if (!result.success || !result.data) return;
+      const thread = (result.data as ThreadMessage[])
+        .filter((n) => n.link && n.link.includes(`activityMessage=${activityId}`))
+        .filter((n) => (user?.is_admin ? (!targetEmail || n.recipient_email === targetEmail) : true))
+        .sort((a, b) => {
+          const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return ta - tb;
+        });
+      setMessageThread(thread);
+    } catch {
+      setMessageThread([]);
     }
   };
 
@@ -192,6 +227,7 @@ export default function Home() {
     if (found) {
       setMessageTarget(found);
       setMessageModalOpen(true);
+      fetchMessageThread(found.id, found.email);
     }
   }, [searchParams, activityLogs]);
 
@@ -566,6 +602,7 @@ export default function Home() {
                   e.stopPropagation();
                   setMessageTarget(log);
                   setMessageModalOpen(true);
+                  fetchMessageThread(log.id, log.email);
                 }}
                 className="rounded-full border border-slate-200 bg-white p-2 text-slate-500 hover:text-slate-700"
                 title="Message user"
@@ -818,6 +855,21 @@ export default function Home() {
                 </button>
               </div>
               <div className="space-y-3">
+                {messageThread.length > 0 && (
+                  <div className="max-h-40 space-y-2 overflow-auto rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+                    {messageThread.map((msg) => (
+                      <div key={msg.id} className="rounded-lg bg-white p-2 border border-slate-200">
+                        <p className="font-semibold text-slate-700">{msg.title}</p>
+                        <p>{msg.message}</p>
+                        {msg.created_at && (
+                          <span className="mt-1 block text-[10px] text-slate-400">
+                            {formatDateTime(msg.created_at)}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <textarea
                   value={messageText}
                   onChange={(e) => setMessageText(e.target.value)}

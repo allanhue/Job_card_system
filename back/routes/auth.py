@@ -42,6 +42,7 @@ class ResetPasswordRequest(BaseModel):
 class AdminCreateUserRequest(BaseModel):
     email: str
     full_name: str | None = None
+    phone: str | None = None
     role: str = "user"  # user | admin
     temp_password: str | None = None
     send_link: bool = True
@@ -366,7 +367,8 @@ async def admin_create_user(
         user = User(
             email=payload.email,
             password=get_password_hash(password),
-            full_name=payload.full_name
+            full_name=payload.full_name,
+            phone=payload.phone,
         )
         db.add(user)
         db.commit()
@@ -375,6 +377,8 @@ async def admin_create_user(
     else:
         if payload.full_name:
             user.full_name = payload.full_name
+        if payload.phone:
+            user.phone = payload.phone
         if payload.temp_password:
             user.password = get_password_hash(payload.temp_password)
         db.commit()
@@ -395,7 +399,7 @@ async def admin_create_user(
 
         frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
         reset_link = f"{frontend_url}/?page=reset&token={token}"
-        from routes.send_mail import send_email
+        from routes.send_mail import send_email, send_sms
         subject = "Set Your Password"
         body = (
             "<p>Your account has been created by an administrator.</p>"
@@ -406,6 +410,15 @@ async def admin_create_user(
             await send_email([user.email], subject, body)
         except Exception:
             pass
+        if user.phone:
+            try:
+                await send_sms(
+                    user.phone,
+                    "Your account has been created. Use the email link to set your password.",
+                    tag="new-user",
+                )
+            except Exception:
+                pass
 
     return {
         "message": "User created" if created else "User updated",

@@ -230,7 +230,10 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
                             method: "POST",
                             headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
                           });
-                          if (note.link) window.location.href = note.link;
+                          if (note.link) {
+                            setUserNotifOpen(false);
+                            window.location.href = note.link;
+                          }
                         }}
                         className={`w-full rounded-xl border px-3 py-2 text-left text-xs transition ${
                           note.read_at
