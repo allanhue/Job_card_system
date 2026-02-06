@@ -11,9 +11,22 @@ router = APIRouter(prefix="/notifications", tags=["Notifications"])
 logger = logging.getLogger(__name__)
 
 
-def cleanup_old_notifications(db: Session, hours: int = 24) -> None:
-    cutoff = datetime.utcnow() - timedelta(hours=hours)
-    db.query(Notification).filter(Notification.created_at < cutoff).delete(synchronize_session=False)
+def cleanup_old_notifications(
+    db: Session,
+    seen_hours: int = 24,
+    unseen_hours: int = 48,
+) -> None:
+    now = datetime.utcnow()
+    seen_cutoff = now - timedelta(hours=seen_hours)
+    unseen_cutoff = now - timedelta(hours=unseen_hours)
+    db.query(Notification).filter(
+        Notification.read_at.is_not(None),
+        Notification.created_at < seen_cutoff,
+    ).delete(synchronize_session=False)
+    db.query(Notification).filter(
+        Notification.read_at.is_(None),
+        Notification.created_at < unseen_cutoff,
+    ).delete(synchronize_session=False)
     db.commit()
 
 
@@ -28,6 +41,11 @@ class NotificationCreate(BaseModel):
     recipient_emails: list[str] | None = None
 
 
+class NotificationReply(BaseModel):
+    link: str
+    message: str
+
+
 @router.post("/")
 def create_notification(
     payload: NotificationCreate,
@@ -35,9 +53,7 @@ def create_notification(
     db: Session = Depends(get_db),
 ):
     try:
-        cutoff = datetime.utcnow() - timedelta(hours=24)
-        db.query(Notification).filter(Notification.created_at < cutoff).delete(synchronize_session=False)
-        db.commit()
+        cleanup_old_notifications(db, seen_hours=24, unseen_hours=48)
         created_ids = []
         recipients = []
         if payload.recipient_id:
@@ -83,9 +99,7 @@ def list_notifications(
     db: Session = Depends(get_db),
 ):
     try:
-        cutoff = datetime.utcnow() - timedelta(hours=24)
-        db.query(Notification).filter(Notification.created_at < cutoff).delete(synchronize_session=False)
-        db.commit()
+        cleanup_old_notifications(db, seen_hours=24, unseen_hours=48)
         query = db.query(Notification)
         if unread_only:
             query = query.filter(Notification.read_at.is_(None))
@@ -120,9 +134,7 @@ def list_my_notifications(
     db: Session = Depends(get_db),
 ):
     try:
-        cutoff = datetime.utcnow() - timedelta(hours=24)
-        db.query(Notification).filter(Notification.created_at < cutoff).delete(synchronize_session=False)
-        db.commit()
+        cleanup_old_notifications(db, seen_hours=24, unseen_hours=48)
         query = db.query(Notification).filter(
             (Notification.recipient_id == current_user.id)
             | (Notification.recipient_email == current_user.email)
@@ -150,6 +162,83 @@ def list_my_notifications(
     except Exception:
         logger.exception("Failed to list user notifications")
         return {"success": False, "data": []}
+
+
+@router.get("/thread")
+def list_thread(
+    link: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        cutoff = datetime.utcnow() - timedelta(hours=24)
+        db.query(Notification).filter(Notification.created_at < cutoff).delete(synchronize_session=False)
+        db.commit()
+        notifications = (
+            db.query(Notification)
+            .filter(Notification.link == link)
+            .filter(
+                (Notification.recipient_id == current_user.id)
+                | (Notification.recipient_email == current_user.email)
+                | (Notification.created_by == current_user.id)
+            )
+            .order_by(Notification.created_at.asc())
+            .all()
+        )
+        return {
+            "success": True,
+            "data": [
+                {
+                    "id": n.id,
+                    "title": n.title,
+                    "message": n.message,
+                    "category": n.category,
+                    "link": n.link,
+                    "recipient_id": n.recipient_id,
+                    "recipient_email": n.recipient_email,
+                    "created_at": n.created_at.isoformat() if n.created_at else None,
+                    "read_at": n.read_at.isoformat() if n.read_at else None,
+                    "created_by": n.created_by,
+                }
+                for n in notifications
+            ],
+        }
+    except Exception:
+        logger.exception("Failed to list notification thread")
+        return {"success": False, "data": []}
+
+
+@router.post("/reply")
+def reply_notification(
+    payload: NotificationReply,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        admins = db.query(User).filter(User.is_admin == True).all()
+        if not admins:
+            raise HTTPException(status_code=400, detail="No admin users available")
+        created_ids = []
+        for admin in admins:
+            notification = Notification(
+                title="User reply",
+                message=payload.message,
+                category="message",
+                link=payload.link,
+                created_by=current_user.id,
+                recipient_id=admin.id,
+                recipient_email=admin.email,
+            )
+            db.add(notification)
+            db.commit()
+            db.refresh(notification)
+            created_ids.append(notification.id)
+        return {"success": True, "ids": created_ids}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Failed to send reply notification")
+        raise HTTPException(status_code=500, detail="Failed to send reply")
 
 
 @router.post("/{notification_id}/read")

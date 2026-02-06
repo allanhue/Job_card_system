@@ -13,6 +13,11 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
   const [userNotifications, setUserNotifications] = useState<any[]>([]);
   const [userNotifOpen, setUserNotifOpen] = useState(false);
   const [notifToast, setNotifToast] = useState("");
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatLink, setChatLink] = useState("");
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [chatText, setChatText] = useState("");
+  const [chatSending, setChatSending] = useState(false);
   const prevUnreadRef = useRef(0);
   const [showPicker, setShowPicker] = useState(false);
   const [pickerLoading, setPickerLoading] = useState(false);
@@ -25,7 +30,7 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
   const navItems = [
     ...(user?.is_admin ? [{ name: "Dashboard", key: "home" }] : []),
     { name: "Invoices", key: "invoices" },
-    { name: "WorkDrive", key: "workdrive", icon: "folder" },
+    ...(user?.is_admin ? [{ name: "WorkDrive", key: "workdrive", icon: "folder" }] : []),
     { name: "Profile", key: "profile" },
   ];
 
@@ -112,6 +117,42 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
     }
     prevUnreadRef.current = unreadUserCount;
   }, [unreadUserCount, userNotifications]);
+
+  const openChat = async (link?: string) => {
+    if (!link) return;
+    setChatLink(link);
+    setChatOpen(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/notifications/thread?link=${encodeURIComponent(link)}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.success && data.data) setChatMessages(data.data);
+    } catch {
+      setChatMessages([]);
+    }
+  };
+
+  const sendChatReply = async () => {
+    if (!chatText.trim() || !chatLink) return;
+    try {
+      setChatSending(true);
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/notifications/reply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ link: chatLink, message: chatText.trim() }),
+      });
+      if (!res.ok) return;
+      setChatText("");
+      await openChat(chatLink);
+    } finally {
+      setChatSending(false);
+    }
+  };
 
   const handleOpenJob = () => {
     if (!selectedInvoiceId) return;
@@ -232,7 +273,7 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
                           });
                           if (note.link) {
                             setUserNotifOpen(false);
-                            window.location.href = note.link;
+                            openChat(note.link);
                           }
                         }}
                         className={`w-full rounded-xl border px-3 py-2 text-left text-xs transition ${
@@ -334,8 +375,9 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
       </div>
 
       {showPicker && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-8">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl border border-slate-200">
+        <div className="fixed inset-0 z-50 bg-black/40">
+          <div className="flex min-h-full items-start justify-center px-4 pt-20 pb-10">
+            <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl border border-slate-200">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-base font-semibold text-slate-900">Create Job Card</h3>
@@ -384,6 +426,7 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
                 You can also open an invoice from the invoice list.
               </p>
             </div>
+            </div>
           </div>
         </div>
       )}
@@ -391,6 +434,57 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
       {notifToast && (
         <div className="fixed right-4 top-16 z-50 rounded-xl border border-orange-200 bg-white px-3 py-2 text-xs text-slate-700 shadow-lg">
           {notifToast}
+        </div>
+      )}
+
+      {chatOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40">
+          <div className="flex min-h-full items-start justify-center px-4 pt-20 pb-10">
+            <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl border border-slate-200">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h4 className="text-lg font-semibold text-slate-900">Messages</h4>
+                  <p className="text-xs text-slate-500">Reply to admin</p>
+                </div>
+                <button
+                  onClick={() => setChatOpen(false)}
+                  className="text-xs text-slate-500 hover:text-slate-700"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="max-h-56 space-y-2 overflow-auto rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+                {chatMessages.length === 0 && <p>No messages yet.</p>}
+                {chatMessages.map((msg) => (
+                  <div key={msg.id} className="rounded-lg bg-white p-2 border border-slate-200">
+                    <p className="font-semibold text-slate-700">{msg.title}</p>
+                    <p>{msg.message}</p>
+                    {msg.created_at && (
+                      <span className="mt-1 block text-[10px] text-slate-400">
+                        {new Date(msg.created_at).toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 space-y-2">
+                <textarea
+                  value={chatText}
+                  onChange={(e) => setChatText(e.target.value)}
+                  rows={3}
+                  placeholder="Write your reply..."
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                />
+                <button
+                  onClick={sendChatReply}
+                  disabled={chatSending || !chatText.trim()}
+                  className="w-full rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  {chatSending ? "Sending..." : "Send Reply"}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </nav>

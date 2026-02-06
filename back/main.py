@@ -46,7 +46,7 @@ async def notification_cleanup_loop() -> None:
     while True:
         try:
             db = SessionLocal()
-            cleanup_old_notifications(db, hours=24)
+            cleanup_old_notifications(db, seen_hours=24, unseen_hours=48)
         except Exception:
             logger.exception("Notification cleanup failed")
         finally:

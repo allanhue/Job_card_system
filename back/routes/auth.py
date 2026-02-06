@@ -474,6 +474,78 @@ def get_all_users(current_user: User = Depends(get_current_admin_user), db: Sess
     ]
 
 
+@router.delete("/admin/users/{user_id}")
+def delete_user_permanently(
+    user_id: int,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.id == user_id:
+        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    try:
+        # Null out assignments to avoid FK issues
+        db.query(JobCard).filter(JobCard.assigned_user_id == user_id).update(
+            {
+                JobCard.assigned_user_id: None,
+                JobCard.assigned_user_email: None,
+                JobCard.assigned_user_name: None,
+            },
+            synchronize_session=False,
+        )
+
+        # Collect invoice ids created by user
+        invoice_ids = [
+            inv.id for inv in db.query(Invoice.id).filter(Invoice.created_by == user_id).all()
+        ]
+        if invoice_ids:
+            db.query(JobCard).filter(JobCard.invoice_id.in_(invoice_ids)).delete(
+                synchronize_session=False
+            )
+            db.query(InvoiceItem).filter(InvoiceItem.invoice_id.in_(invoice_ids)).delete(
+                synchronize_session=False
+            )
+            db.query(Invoice).filter(Invoice.id.in_(invoice_ids)).delete(
+                synchronize_session=False
+            )
+
+        # Delete job cards created by user
+        db.query(JobCard).filter(JobCard.created_by == user_id).delete(
+            synchronize_session=False
+        )
+
+        # Delete zoho invoices created by user
+        db.query(ZohoInvoice).filter(ZohoInvoice.created_by == user_id).delete(
+            synchronize_session=False
+        )
+
+        # Delete notifications related to user
+        db.query(Notification).filter(
+            (Notification.created_by == user_id)
+            | (Notification.recipient_id == user_id)
+            | (Notification.recipient_email == user.email)
+        ).delete(synchronize_session=False)
+
+        # Delete password reset tokens
+        db.query(PasswordResetToken).filter(PasswordResetToken.user_id == user_id).delete(
+            synchronize_session=False
+        )
+
+        # Finally delete user
+        db.delete(user)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.exception("Failed to delete user")
+        raise HTTPException(status_code=500, detail="Failed to delete user")
+
+    return {"success": True, "message": "User deleted"}
+
+
 @router.get("/users/list")
 def get_users_list(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     users = db.query(User).all()

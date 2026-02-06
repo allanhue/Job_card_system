@@ -29,6 +29,12 @@ export default function ProfilePage() {
   });
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [adminMessage, setAdminMessage] = useState("");
+  const [adminUsers, setAdminUsers] = useState<
+    { id: number; email: string; full_name?: string; is_admin: boolean; last_seen?: string | null }[]
+  >([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersError, setUsersError] = useState("");
+  const [openUserMenu, setOpenUserMenu] = useState<number | null>(null);
 
   const getInitials = (name: string) =>
     name
@@ -53,6 +59,12 @@ export default function ProfilePage() {
   useEffect(() => {
     refreshUser();
   }, [refreshUser]);
+
+  useEffect(() => {
+    if (showAdminModal) {
+      fetchAdminUsers();
+    }
+  }, [showAdminModal]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,12 +150,47 @@ export default function ProfilePage() {
         temp_password: "",
         send_link: true,
       });
+      fetchAdminUsers();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to create user";
       pushToast("error", msg);
       setAdminMessage(msg);
     } finally {
       setAdminLoading(false);
+    }
+  };
+
+  const fetchAdminUsers = async () => {
+    setUsersLoading(true);
+    setUsersError("");
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/auth/users`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed to load users");
+      const data = await res.json();
+      setAdminUsers(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setUsersError(err instanceof Error ? err.message : "Failed to load users");
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async (userId: number) => {
+    if (!confirm("Delete this user and all related data? This cannot be undone.")) return;
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/auth/admin/users/${userId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed to delete user");
+      pushToast("success", "User deleted");
+      fetchAdminUsers();
+    } catch (err) {
+      pushToast("error", err instanceof Error ? err.message : "Failed to delete user");
     }
   };
 
@@ -347,9 +394,10 @@ export default function ProfilePage() {
         </div>
 
         {user.is_admin && showAdminModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl border border-slate-200">
-              <div className="flex items-center justify-between mb-4">
+          <div className="fixed inset-0 z-50 bg-black/40">
+            <div className="flex min-h-full items-start justify-center px-4 pt-16 pb-10">
+              <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl border border-slate-200 max-h-[90vh] overflow-hidden">
+                <div className="flex items-center justify-between mb-4">
                 <div>
                   <h2 className="text-lg font-bold text-slate-900">Create User</h2>
                   <p className="text-xs text-slate-500">Admin only</p>
@@ -361,12 +409,14 @@ export default function ProfilePage() {
                   Close
                 </button>
               </div>
-              {adminMessage && (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
-                  {adminMessage}
                 </div>
-              )}
-              <form onSubmit={handleAdminCreate} className="space-y-4">
+                <div className="space-y-4 overflow-y-auto pr-1 max-h-[78vh]">
+                  {adminMessage && (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                      {adminMessage}
+                    </div>
+                  )}
+                  <form onSubmit={handleAdminCreate} className="space-y-4">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Email</label>
                   <input
@@ -430,6 +480,9 @@ export default function ProfilePage() {
                   />
                   Send password setup link via email
                 </label>
+                <p className="text-[11px] text-slate-500">
+                  If you set a temporary password, the user can still reset via the email link.
+                </p>
 
                 <button
                   type="submit"
@@ -439,7 +492,62 @@ export default function ProfilePage() {
                   {adminLoading && <LoadingSpinner size={16} variant="light" />}
                   Create User
                 </button>
-              </form>
+                  </form>
+
+              <div className="mt-6 border-t border-slate-200 pt-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-slate-800">Manage Users</h3>
+                  <button
+                    onClick={fetchAdminUsers}
+                    className="text-xs text-slate-500 hover:text-slate-700"
+                  >
+                    Refresh
+                  </button>
+                </div>
+                {usersLoading && (
+                  <p className="mt-2 text-xs text-slate-500">Loading users...</p>
+                )}
+                {usersError && <p className="mt-2 text-xs text-red-600">{usersError}</p>}
+                <div className="mt-3 max-h-56 space-y-2 overflow-auto">
+                  {adminUsers.map((u) => (
+                    <div
+                      key={u.id}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                    >
+                      <div>
+                        <p className="font-semibold text-slate-800">{u.full_name || "User"}</p>
+                        <p className="text-slate-500">{u.email}</p>
+                      </div>
+                      <div className="relative">
+                        <button
+                          onClick={() => setOpenUserMenu(openUserMenu === u.id ? null : u.id)}
+                          className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 hover:text-slate-800"
+                        >
+                          •••
+                        </button>
+                        {openUserMenu === u.id && (
+                          <div className="absolute right-0 mt-2 w-40 rounded-lg border border-slate-200 bg-white p-2 shadow-lg z-10">
+                            <div className="px-2 py-1 text-[11px] text-slate-500">
+                              Status: Online
+                            </div>
+                            <button
+                              onClick={() => handleDeleteUser(u.id)}
+                              className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                            >
+                              <span>Delete</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {adminUsers.length === 0 && !usersLoading && (
+                    <p className="text-xs text-slate-500">No users found.</p>
+                  )}
+                </div>
+              </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
