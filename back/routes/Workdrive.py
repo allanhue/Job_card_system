@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
@@ -22,7 +22,9 @@ logger = logging.getLogger(__name__)
 class WorkdriveCheckRequest(BaseModel):
     currency: Optional[str] = None
     statuses: Optional[List[str]] = None
-    email: Optional[EmailStr] = None
+    email: Optional[str] = None
+    date_from: Optional[str] = None
+    date_to: Optional[str] = None
 
 
 class TokenManager:
@@ -59,7 +61,8 @@ ZOHO_BOOKS_2_CONFIG = {
     "organization_id": os.getenv("ZOHO_BOOKS_ORGANIZATION_ID"),
 }
 
-SCANNED_FOLDER_ID = os.getenv("ZOHO_WORDRIVE_SCANNED_FOLDER_ID")
+SCANNED_FOLDER_ID = os.getenv("ZOHO_WORDRIVE_SCANNED_FOLDER_ID", "0mqdi73cabe780dcf49adb599e8e650cf893e")
+
 
 
 def get_new_access_token(config: dict, manager: TokenManager) -> str:
@@ -102,12 +105,16 @@ def normalize_currency(selected_currency: Optional[str]) -> str:
     return selected_currency.upper()
 
 
-def fetch_books_invoices(currency_code: str) -> list:
+def fetch_books_invoices(currency_code: str, date_from: Optional[str], date_to: Optional[str]) -> list:
     access_token = get_valid_access_token(ZOHO_BOOKS_2_CONFIG, books2_token_manager)
     headers = {"Authorization": f"Zoho-oauthtoken {access_token}"}
     params = {"organization_id": ZOHO_BOOKS_2_CONFIG.get("organization_id")}
     if currency_code:
         params["currency_code"] = currency_code
+    if date_from:
+        params["date_start"] = date_from
+    if date_to:
+        params["date_end"] = date_to
 
     try:
         response = requests.get(
@@ -125,14 +132,24 @@ def fetch_books_invoices(currency_code: str) -> list:
                 params=params,
                 timeout=30,
             )
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError:
+            logger.error("Books API error %s: %s", response.status_code, response.text)
+            raise
         data = response.json()
         if data.get("code") not in [0, None]:
-            raise HTTPException(status_code=500, detail=f"Books error: {data.get('message')}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Books error: {data.get('message') or response.text}",
+            )
         return data.get("invoices", [])
     except requests.exceptions.RequestException as e:
         logger.error("Books API request failed: %s", str(e))
-        raise HTTPException(status_code=500, detail=f"Books API request failed: {str(e)}")
+        detail = f"Books API request failed: {str(e)}"
+        if hasattr(e, "response") and e.response is not None:
+            detail = f"Books API request failed: {e.response.status_code} {e.response.text}"
+        raise HTTPException(status_code=500, detail=detail)
 
 
 def fetch_workdrive_invoice_numbers(folder_id: str) -> list:
@@ -149,11 +166,18 @@ def fetch_workdrive_invoice_numbers(folder_id: str) -> list:
             access_token = get_new_access_token(ZOHO_WORDRIVE_CONFIG, wordrive_token_manager)
             headers["Authorization"] = f"Zoho-oauthtoken {access_token}"
             folder_response = requests.get(folder_info_url, headers=headers, timeout=20)
-        folder_response.raise_for_status()
+        try:
+            folder_response.raise_for_status()
+        except requests.exceptions.HTTPError:
+            logger.error("WorkDrive folder error %s: %s", folder_response.status_code, folder_response.text)
+            raise
         folder_data = folder_response.json()
     except requests.exceptions.RequestException as e:
         logger.error("WorkDrive folder request failed: %s", str(e))
-        raise HTTPException(status_code=500, detail=f"WorkDrive request failed: {str(e)}")
+        detail = f"WorkDrive request failed: {str(e)}"
+        if hasattr(e, "response") and e.response is not None:
+            detail = f"WorkDrive request failed: {e.response.status_code} {e.response.text}"
+        raise HTTPException(status_code=500, detail=detail)
 
     errors = folder_data.get("errors")
     if errors:
@@ -172,11 +196,18 @@ def fetch_workdrive_invoice_numbers(folder_id: str) -> list:
 
     try:
         files_response = requests.get(related_url, headers=headers, timeout=20)
-        files_response.raise_for_status()
+        try:
+            files_response.raise_for_status()
+        except requests.exceptions.HTTPError:
+            logger.error("WorkDrive files error %s: %s", files_response.status_code, files_response.text)
+            raise
         files_data = files_response.json().get("data", [])
     except requests.exceptions.RequestException as e:
         logger.error("WorkDrive files request failed: %s", str(e))
-        raise HTTPException(status_code=500, detail=f"WorkDrive files request failed: {str(e)}")
+        detail = f"WorkDrive files request failed: {str(e)}"
+        if hasattr(e, "response") and e.response is not None:
+            detail = f"WorkDrive files request failed: {e.response.status_code} {e.response.text}"
+        raise HTTPException(status_code=500, detail=detail)
 
     invoice_numbers = []
     for item in files_data:
@@ -202,7 +233,9 @@ def fetch_workdrive_invoice_numbers(folder_id: str) -> list:
 async def check_invoices(payload: WorkdriveCheckRequest):
     selected_currency = payload.currency or ""
     selected_statuses = payload.statuses or []
-    recipient_email = payload.email
+    recipient_email = (payload.email or "").strip()
+    date_from = payload.date_from or ""
+    date_to = payload.date_to or ""
 
     api_currency_code = normalize_currency(selected_currency)
     logger.info("Currency: %s", selected_currency)
@@ -212,7 +245,7 @@ async def check_invoices(payload: WorkdriveCheckRequest):
     if not ZOHO_BOOKS_2_CONFIG.get("organization_id"):
         raise HTTPException(status_code=400, detail="ZOHO_BOOKS_ORGANIZATION_ID not set")
 
-    all_invoices = fetch_books_invoices(api_currency_code)
+    all_invoices = fetch_books_invoices(api_currency_code, date_from, date_to)
 
     invoice_numbers = []
     for inv in all_invoices:
@@ -222,6 +255,19 @@ async def check_invoices(payload: WorkdriveCheckRequest):
 
         if api_currency_code and inv_currency != api_currency_code:
             continue
+        if (date_from or date_to) and inv.get("date"):
+            try:
+                inv_date = datetime.strptime(inv.get("date"), "%Y-%m-%d").date()
+                if date_from:
+                    start_date = datetime.strptime(date_from, "%Y-%m-%d").date()
+                    if inv_date < start_date:
+                        continue
+                if date_to:
+                    end_date = datetime.strptime(date_to, "%Y-%m-%d").date()
+                    if inv_date > end_date:
+                        continue
+            except ValueError:
+                pass
 
         if not selected_statuses:
             invoice_numbers.append(inv_number)
@@ -253,36 +299,45 @@ async def check_invoices(payload: WorkdriveCheckRequest):
             missing_list.append(book_inv)
 
     email_sent = False
-    missing_list_text = "None ✓"
+    missing_list_text = "None"
     if missing_count > 0:
         missing_list_text = ", ".join(missing_list[:20])
         if missing_count > 20:
             missing_list_text = f"{missing_list_text}... +{missing_count - 20}"
 
     if file_invoice_numbers and recipient_email:
+        range_label = ""
+        if date_from or date_to:
+            range_label = f"{date_from or '...'} to {date_to or '...'}"
         email_subject = f"Twatitara ETR Parser Check - {selected_statuses} ({api_currency_code})"
         email_message = (
-            "<html><body style='font-family: Arial;'>"
-            "<h2 style='color: #2c5aa0;'>ETR Report</h2>"
-            f"<p><strong>Date:</strong> {datetime.now().strftime('%d-%b-%Y')}</p>"
-            f"<p><strong>Filter:</strong> {selected_statuses} ({api_currency_code})</p>"
-            "<hr>"
-            "<table style='border-collapse: collapse; width: 100%;'>"
-            f"<tr><td style='padding: 8px; border: 1px solid #ddd;'>Books Invoices</td>"
-            f"<td style='padding: 8px; border: 1px solid #ddd;'>{len(invoice_numbers)}</td></tr>"
-            f"<tr><td style='padding: 8px; border: 1px solid #ddd;'>WorkDrive Files</td>"
-            f"<td style='padding: 8px; border: 1px solid #ddd;'>{len(file_invoice_numbers)}</td></tr>"
-            "<tr style='background: #d4edda;'>"
-            f"<td style='padding: 8px; border: 1px solid #ddd;'><strong>✓ Matched</strong></td>"
-            f"<td style='padding: 8px; border: 1px solid #ddd;'><strong>{matched_count}</strong></td></tr>"
-            "<tr style='background: #f8d7da;'>"
-            f"<td style='padding: 8px; border: 1px solid #ddd;'><strong>✗ Missing</strong></td>"
-            f"<td style='padding: 8px; border: 1px solid #ddd;'><strong>{missing_count}</strong></td></tr>"
-            "</table>"
-            "<h3>Missing:</h3>"
-            f"<p>{missing_list_text}</p>"
-            "<hr>"
-            "<p style='color: #999; font-size: 11px;'>Auto-generated</p>"
+            "<html><body style='font-family: Arial; background: #f6f8fb; padding: 16px;'>"
+            "<div style='max-width: 700px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;'>"
+            "<div style='background: linear-gradient(90deg, #1d4ed8, #0ea5e9); color: white; padding: 20px;'>"
+            "<h2 style='margin: 0; font-size: 20px;'>ETR WorkDrive Report</h2>"
+            f"<p style='margin: 6px 0 0; font-size: 12px;'>Generated {datetime.now().strftime('%d-%b-%Y %H:%M')}</p>"
+            "</div>"
+            "<div style='padding: 20px;'>"
+            f"<p style='margin: 0 0 6px;'><strong>Filter:</strong> {selected_statuses} ({api_currency_code or 'ALL'})</p>"
+            + (f"<p style='margin: 0 0 12px;'><strong>Date range:</strong> {range_label}</p>" if range_label else "")
+            "<div style='display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px;'>"
+            f"<div style='flex: 1; min-width: 140px; background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px;'><div style='font-size: 12px; color: #64748b;'>Books Invoices</div><div style='font-size: 18px; font-weight: 700;'>{len(invoice_numbers)}</div></div>"
+            f"<div style='flex: 1; min-width: 140px; background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px;'><div style='font-size: 12px; color: #64748b;'>WorkDrive Files</div><div style='font-size: 18px; font-weight: 700;'>{len(file_invoice_numbers)}</div></div>"
+            f"<div style='flex: 1; min-width: 140px; background: #ecfdf5; border: 1px solid #bbf7d0; padding: 12px; border-radius: 8px;'><div style='font-size: 12px; color: #166534;'>Matched</div><div style='font-size: 18px; font-weight: 700; color: #166534;'>{matched_count}</div></div>"
+            f"<div style='flex: 1; min-width: 140px; background: #fef2f2; border: 1px solid #fecaca; padding: 12px; border-radius: 8px;'><div style='font-size: 12px; color: #991b1b;'>Missing</div><div style='font-size: 18px; font-weight: 700; color: #991b1b;'>{missing_count}</div></div>"
+            "</div>"
+            "<h3 style='margin: 0 0 8px; font-size: 16px;'>Missing Invoices</h3>"
+            + (
+                "<ul style='padding-left: 18px; margin: 0;'>"
+                + "".join([f"<li style='margin: 2px 0;'>{inv}</li>" for inv in missing_list[:40]])
+                + ("<li>... more omitted</li>" if missing_count > 40 else "")
+                + "</ul>"
+                if missing_count > 0
+                else "<p style='margin: 0; color: #16a34a;'>None</p>"
+            )
+            + "</div>"
+            "<div style='padding: 12px 20px; background: #f8fafc; font-size: 11px; color: #94a3b8;'>Auto-generated ETR report</div>"
+            "</div>"
             "</body></html>"
         )
         await send_email([recipient_email], email_subject, email_message)
@@ -298,5 +353,6 @@ async def check_invoices(payload: WorkdriveCheckRequest):
         "missing": missing_count,
         "missing_list": missing_list,
         "email_sent": email_sent,
+        "date_from": date_from,
+        "date_to": date_to,
     }
-
