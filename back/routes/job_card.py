@@ -4,12 +4,15 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from db import get_db
-from routes.auth import get_current_user, User, Invoice, JobCard, ZohoInvoice
+from routes.auth import get_current_user, User, Invoice, JobCard, ZohoInvoice, Notification
 from routes.send_mail import send_email
 from datetime import timedelta
 import os
 import json
 import uuid
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/job-cards", tags=["JobCards"])
 
@@ -178,6 +181,8 @@ async def create_job_card(
             assigned_user = db.query(User).filter(User.id == int(assigned_user_id)).first()
         except Exception:
             assigned_user = None
+    if not assigned_user and email:
+        assigned_user = db.query(User).filter(User.email == email).first()
 
     job_card = JobCard(
         job_card_number=job_card_number,
@@ -201,6 +206,21 @@ async def create_job_card(
     db.add(job_card)
     db.commit()
     db.refresh(job_card)
+
+    try:
+        notification = Notification(
+            title="Job card created",
+            message=f"{job_card.job_card_number} for invoice {job_card.invoice_number}",
+            category="job_card",
+            link=f"/?page=invoices&openInvoice={job_card.invoice_id}",
+            created_by=current_user.id,
+            recipient_id=assigned_user.id if assigned_user else None,
+            recipient_email=assigned_user.email if assigned_user else email,
+        )
+        db.add(notification)
+        db.commit()
+    except Exception:
+        logger.exception("Failed to create notification")
 
     if email and (notify_email is None or notify_email):
         try:

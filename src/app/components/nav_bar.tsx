@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "../Utils/auth";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface NavBarProps {
   currentPage: string;
@@ -10,6 +10,10 @@ interface NavBarProps {
 
 export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
   const { user, logout } = useAuth();
+  const [userNotifications, setUserNotifications] = useState<any[]>([]);
+  const [userNotifOpen, setUserNotifOpen] = useState(false);
+  const [notifToast, setNotifToast] = useState("");
+  const prevUnreadRef = useRef(0);
   const [showPicker, setShowPicker] = useState(false);
   const [pickerLoading, setPickerLoading] = useState(false);
   const [pickerError, setPickerError] = useState("");
@@ -57,6 +61,57 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
     };
     fetchInvoices();
   }, [showPicker]);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchNotifs = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const endpoint = user?.is_admin ? "/notifications?limit=6" : "/notifications/me?limit=6";
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}${endpoint}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.success && data.data) setUserNotifications(data.data);
+      } catch {
+        setUserNotifications([]);
+      }
+    };
+    fetchNotifs();
+    const interval = setInterval(fetchNotifs, 30000);
+    return () => clearInterval(interval);
+  }, [user]);
+
+  const unreadUserCount = userNotifications.filter((n) => !n.read_at).length;
+
+  useEffect(() => {
+    if (unreadUserCount > prevUnreadRef.current) {
+      const latestUnread = userNotifications.find((n) => !n.read_at);
+      if (latestUnread) {
+        setNotifToast(latestUnread.title || "New message");
+        try {
+          const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext;
+          if (AudioCtx) {
+            const ctx = new AudioCtx();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = "sine";
+            osc.frequency.value = 880;
+            gain.gain.value = 0.04;
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.15);
+          }
+        } catch {
+          // noop
+        }
+        setTimeout(() => setNotifToast(""), 3000);
+      }
+    }
+    prevUnreadRef.current = unreadUserCount;
+  }, [unreadUserCount, userNotifications]);
 
   const handleOpenJob = () => {
     if (!selectedInvoiceId) return;
@@ -128,6 +183,74 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
 
           {/* Actions */}
           <div className="hidden md:flex gap-2 sm:gap-3 items-center">
+            <div className="relative">
+              <button
+                onClick={() => setUserNotifOpen((prev) => !prev)}
+                className="relative rounded-full border border-slate-200 bg-white p-2 text-slate-600 hover:text-slate-900"
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0a3 3 0 11-6 0h6z"
+                  />
+                </svg>
+                {unreadUserCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] rounded-full bg-orange-500 px-1 text-[10px] font-semibold text-white">
+                    {unreadUserCount}
+                  </span>
+                )}
+              </button>
+              {userNotifOpen && (
+                <div className="absolute right-0 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-semibold text-slate-700">Messages</p>
+                    <button
+                      onClick={() => setUserNotifOpen(false)}
+                      className="text-xs text-slate-400 hover:text-slate-600"
+                    >
+                      Close
+                    </button>
+                  </div>
+                  <div className="space-y-2 max-h-72 overflow-auto">
+                    {userNotifications.length === 0 && (
+                      <p className="text-xs text-slate-500">No messages yet.</p>
+                    )}
+                    {userNotifications.map((note) => (
+                      <button
+                        key={note.id}
+                        onClick={() => {
+                          fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/notifications/${note.id}/read`, {
+                            method: "POST",
+                            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+                          });
+                          if (note.link) window.location.href = note.link;
+                        }}
+                        className={`w-full rounded-xl border px-3 py-2 text-left text-xs transition ${
+                          note.read_at
+                            ? "border-slate-200 bg-white text-slate-600"
+                            : "border-orange-200 bg-orange-50 text-slate-800"
+                        }`}
+                      >
+                        <p className="font-semibold">{note.title}</p>
+                        <p className="text-slate-500">{note.message}</p>
+                        {note.created_at && (
+                          <span className="mt-1 block text-[10px] text-slate-400">
+                            {new Date(note.created_at).toLocaleString()}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
             <span className="text-xs sm:text-sm text-gray-600">
               {user?.full_name || user?.email}
             </span>
@@ -259,6 +382,12 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
               </p>
             </div>
           </div>
+        </div>
+      )}
+
+      {notifToast && (
+        <div className="fixed right-4 top-16 z-50 rounded-xl border border-orange-200 bg-white px-3 py-2 text-xs text-slate-700 shadow-lg">
+          {notifToast}
         </div>
       )}
     </nav>

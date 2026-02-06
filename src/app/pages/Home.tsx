@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import LoadingSpinner from "@/app/components/LoadingSpinner";
 import { useAuth } from "@/app/Utils/auth";
+import { useSearchParams } from "next/navigation";
 
 interface AnalyticsData {
   total_invoices: number;
@@ -41,6 +42,7 @@ interface JobCardStats {
 
 export default function Home() {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [jobCardStats, setJobCardStats] = useState<JobCardStats | null>(null);
@@ -49,6 +51,10 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeLog, setActiveLog] = useState<ActivityLog | null>(null);
+  const [messageModalOpen, setMessageModalOpen] = useState(false);
+  const [messageTarget, setMessageTarget] = useState<ActivityLog | null>(null);
+  const [messageText, setMessageText] = useState("");
+  const [messageSending, setMessageSending] = useState(false);
 
   const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
@@ -64,7 +70,7 @@ export default function Home() {
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [statusFilter]);
+  }, [statusFilter, user?.is_admin]);
 
   const fetchAnalytics = async () => {
     setLoading(true);
@@ -150,6 +156,44 @@ export default function Home() {
       setJobCardStats(null);
     }
   };
+
+  const sendActivityMessage = async () => {
+    if (!messageTarget || !messageText.trim()) return;
+    try {
+      setMessageSending(true);
+      const token = localStorage.getItem("token");
+      const payload = {
+        title: "Admin message",
+        message: messageText.trim(),
+        category: "message",
+        link: `/?page=home&activityMessage=${encodeURIComponent(messageTarget.id)}`,
+        recipient_email: messageTarget.email || null,
+      };
+      const res = await fetch(`${API_URL}/notifications`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("Failed to send message");
+      setMessageText("");
+      setMessageModalOpen(false);
+      setMessageTarget(null);
+    } catch {
+      // noop
+    } finally {
+      setMessageSending(false);
+    }
+  };
+
+  useEffect(() => {
+    const targetId = searchParams?.get("activityMessage");
+    if (!targetId || activityLogs.length === 0) return;
+    const found = activityLogs.find((log) => log.id === targetId);
+    if (found) {
+      setMessageTarget(found);
+      setMessageModalOpen(true);
+    }
+  }, [searchParams, activityLogs]);
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("en-US", {
@@ -472,7 +516,7 @@ export default function Home() {
       </header>
 
       <div className="space-y-4">
-        {activityLogs.map((log) => (
+        {activityLogs.slice(0, 5).map((log) => (
           <div
             key={log.id}
             className="flex items-start gap-4 rounded-xl border border-slate-100 bg-slate-50 p-4 transition hover:bg-slate-100 cursor-pointer"
@@ -516,7 +560,27 @@ export default function Home() {
                 )}
               </div>
             </div>
-            <span className="text-xs text-slate-400">{formatDateTime(log.raw_timestamp)}</span>
+            <div className="flex flex-col items-end gap-2">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMessageTarget(log);
+                  setMessageModalOpen(true);
+                }}
+                className="rounded-full border border-slate-200 bg-white p-2 text-slate-500 hover:text-slate-700"
+                title="Message user"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M7 8h10M7 12h6m-8 8l4-4h11a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v9a2 2 0 002 2h1z"
+                  />
+                </svg>
+              </button>
+              <span className="text-xs text-slate-400">{formatDateTime(log.raw_timestamp)}</span>
+            </div>
           </div>
         ))}
       </div>
@@ -728,6 +792,46 @@ export default function Home() {
                     {activeLog.timestamp}
                   </span>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {messageModalOpen && messageTarget && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl border border-slate-200">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h4 className="text-lg font-semibold text-slate-900">Send Message</h4>
+                  <p className="text-xs text-slate-500">
+                    {messageTarget.email || "No email on file"}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setMessageModalOpen(false);
+                    setMessageTarget(null);
+                  }}
+                  className="text-xs text-slate-500 hover:text-slate-700"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="space-y-3">
+                <textarea
+                  value={messageText}
+                  onChange={(e) => setMessageText(e.target.value)}
+                  rows={4}
+                  placeholder="Write a message to the user..."
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                />
+                <button
+                  onClick={sendActivityMessage}
+                  disabled={messageSending || !messageText.trim()}
+                  className="w-full rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  {messageSending ? "Sending..." : "Send Message"}
+                </button>
               </div>
             </div>
           </div>

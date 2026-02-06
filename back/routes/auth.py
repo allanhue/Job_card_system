@@ -175,6 +175,20 @@ class JobCard(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, nullable=False)
+    message = Column(Text, nullable=False)
+    category = Column(String, nullable=True)
+    link = Column(String, nullable=True)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    recipient_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    recipient_email = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    read_at = Column(DateTime, nullable=True)
+
 
 Base.metadata.create_all(bind=engine)
 

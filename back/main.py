@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 import os
-from routes import zoho_books, auth, invoices, job_card, send_mail, Workdrive
+from routes import zoho_books, auth, invoices, job_card, send_mail, Workdrive, notifications
 
 app = FastAPI(title="Job Card API")
 
@@ -29,6 +29,7 @@ app.include_router(invoices.router)
 app.include_router(job_card.router)
 app.include_router(send_mail.router)
 app.include_router(Workdrive.router)
+app.include_router(notifications.router)
 
 uploads_dir = os.path.join(os.path.dirname(__file__), "uploads")
 os.makedirs(uploads_dir, exist_ok=True)
