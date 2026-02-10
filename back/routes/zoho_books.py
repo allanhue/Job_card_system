@@ -70,8 +70,8 @@ if missing_vars:
     raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
 
 def get_new_access_token() -> str:
-    """Get new access token using refresh token"""
-    logger.info("Requesting new access token...")
+    # Get new access token using refresh token
+    logger.info("Request for new token ..")
     
     url = "https://accounts.zoho.com/oauth/v2/token"
     params = {
@@ -105,7 +105,7 @@ def get_new_access_token() -> str:
         raise HTTPException(status_code=500, detail=f"Token request failed: {str(e)}")
 
 def get_valid_access_token() -> str:
-    """Get valid access token, refresh if needed"""
+    # Get valid access token, refresh if needed
     if token_manager.is_token_valid():
         logger.info("Using existing valid token")
         return token_manager.access_token
@@ -165,7 +165,7 @@ def make_zoho_books_request(endpoint: str, method: str = "POST", data: dict = No
 
 @router.get("/test-token")
 def test_token_refresh():
-    """Test endpoint to manually trigger token refresh"""
+    # Test endpoint to manually trigger token refresh
     try:
         logger.info("Testing token refresh...")
         access_token = get_new_access_token()
@@ -182,7 +182,7 @@ def test_token_refresh():
 
 @router.get("/organizations")
 def get_organizations():
-    """Get list of organizations"""
+    # Get list of organizations"""
     try:
         logger.info("Fetching organizations...")
         result = make_zoho_books_request(

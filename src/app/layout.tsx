@@ -3,7 +3,7 @@ import { AuthProvider } from "./Utils/auth";
 import { ToastProvider } from "./Utils/toast";
 
 export const metadata = {
-  title: "JobCard Pro",
+  title: "JobCard",
   description: "Professional Invoice and Job Card Management",
 };
 

@@ -183,7 +183,7 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
               </svg>
             </div>
             <span className="text-sm sm:text-base font-semibold bg-gradient-to-r from-[var(--accent-primary)] to-[var(--accent-secondary)] bg-clip-text text-transparent">
-              JobCard Pro
+              Job Card
             </span>
           </div>
 
@@ -191,7 +191,10 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
           <div className="hidden md:flex gap-4 sm:gap-6">
             {navItems.map((item) => (
               <button
+
                 key={item.key}
+                //add  cursor pointer 
+                style={{ cursor: "pointer" }}
                 onClick={() => onNavigate(item.key)}
                 className={`relative flex items-center gap-1.5 text-xs sm:text-sm font-medium transition-all py-1 px-2 rounded-md ${
                   currentPage === item.key

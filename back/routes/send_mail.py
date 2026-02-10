@@ -8,6 +8,7 @@ load_dotenv()
 
 router = APIRouter(prefix="/mail", tags=["Mail"])
 
+# mail password is the api key 
 BREVO_API_KEY = os.getenv("MAIL_PASSWORD") or os.getenv("BREVO_API_KEY") or os.getenv("SENDINBLUE_API_KEY")
 MAIL_FROM = os.getenv("MAIL_FROM")
 MAIL_FROM_NAME = os.getenv("MAIL_FROM_NAME", "Job Card System")
