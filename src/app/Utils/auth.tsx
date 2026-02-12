@@ -8,7 +8,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<any>;
   logout: () => void;
   loading: boolean;
-  refreshUser: () => Promise<void>;
+  refreshUser: (strict?: boolean) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -18,37 +18,74 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  useEffect(() => {
-    // Check for stored auth data on mount
-    const token = localStorage.getItem("token");
-    const storedUser = localStorage.getItem("user");
-    
-    if (token && storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (error) {
-        console.error("Error parsing stored user data:", error);
-        localStorage.clear();
-      }
-    }
-    setLoading(false);
+  const clearAuth = useCallback(() => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    localStorage.removeItem("page");
+    setUser(null);
   }, []);
 
-  const refreshUser = useCallback(async () => {
+  const refreshUser = useCallback(async (strict = true) => {
     try {
       const token = localStorage.getItem("token");
-      if (!token) return;
+      if (!token) return false;
       const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        if (strict && (res.status === 401 || res.status === 403)) {
+          clearAuth();
+        }
+        return false;
+      }
       const data = await res.json();
       localStorage.setItem("user", JSON.stringify(data));
       setUser(data);
+      return true;
     } catch {
-      // noop
+      return false;
     }
-  }, []);
+  }, [clearAuth]);
+
+  useEffect(() => {
+    // Check for stored auth data on mount and validate token
+    let isMounted = true;
+    const init = async () => {
+      const token = localStorage.getItem("token");
+      const storedUser = localStorage.getItem("user");
+      
+      if (!token) {
+        if (storedUser) {
+          clearAuth();
+        }
+        if (isMounted) {
+          setLoading(false);
+        }
+        return;
+      }
+
+      if (storedUser) {
+        try {
+          setUser(JSON.parse(storedUser));
+        } catch (error) {
+          console.error("Error parsing stored user data:", error);
+          clearAuth();
+          if (isMounted) {
+            setLoading(false);
+          }
+          return;
+        }
+      }
+      await refreshUser(true);
+      if (isMounted) {
+        setLoading(false);
+      }
+    };
+    init();
+    return () => {
+      isMounted = false;
+    };
+  }, [clearAuth, refreshUser]);
 
   const login = useCallback(async (email: string, password: string) => {
     try {
@@ -71,10 +108,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.clear();
-    setUser(null);
-    router.push("/login");
-  }, [router]);
+    clearAuth();
+    router.push("/?page=login");
+  }, [clearAuth, router]);
 
   const value = { user, login, logout, loading, refreshUser };
 

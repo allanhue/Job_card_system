@@ -40,6 +40,7 @@ function PageContent() {
   const pageParam = searchParams?.get("page");
   const statusParam = searchParams?.get("status") || "all";
   const viewParam = searchParams?.get("view") || "";
+  const effectivePage = pageParam || currentPage;
 
   useEffect(() => {
     if (!pageParam) return;
@@ -58,6 +59,18 @@ function PageContent() {
     }
   }, [user, pageParam, currentPage, router]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (user) return;
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("page");
+    }
+    if (!["login", "forgot", "reset"].includes(effectivePage)) {
+      setCurrentPage("login");
+      router.replace("/?page=login");
+    }
+  }, [user, loading, effectivePage, router]);
+
   const handleNavigate = useCallback(
     (page: string) => {
       setCurrentPage(page);
@@ -66,8 +79,6 @@ function PageContent() {
     },
     [router]
   );
-
-  const effectivePage = pageParam || currentPage;
 
   if (loading) {
     return (
