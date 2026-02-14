@@ -13,6 +13,7 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
   const [userNotifications, setUserNotifications] = useState<any[]>([]);
   const [userNotifOpen, setUserNotifOpen] = useState(false);
   const [notifToast, setNotifToast] = useState("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatLink, setChatLink] = useState("");
   const [chatMessages, setChatMessages] = useState<any[]>([]);
@@ -161,10 +162,34 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
     window.location.href = url;
   };
 
+  const handleMobileNavigate = (key: string) => {
+    onNavigate(key);
+    setMobileMenuOpen(false);
+  };
+
   return (
     <nav className="sticky top-0 z-40 w-full border-b border-[#e9ecef] bg-white/80 backdrop-blur-md shadow-sm page-fade">
       <div className="mx-auto max-w-7xl px-3 sm:px-4 lg:px-8">
         <div className="flex h-12 sm:h-14 items-center justify-between">
+          {/* Mobile Menu Button (Left) */}
+          <button
+            onClick={() => setMobileMenuOpen((prev) => !prev)}
+            className="md:hidden rounded-lg p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+            aria-label="Toggle navigation menu"
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-nav-menu"
+          >
+            {mobileMenuOpen ? (
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            )}
+          </button>
+
           {/* Logo */}
           <div className="flex items-center gap-2">
             <div className="flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--accent-primary)] to-[var(--accent-secondary)]">
@@ -314,24 +339,20 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
               Create Job
             </button>
           </div>
-
-          {/* Mobile Menu Button */}
-          <button
-            className="md:hidden rounded-lg p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-          >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
         </div>
 
         {/* Mobile Navigation Menu */}
-        <div className="md:hidden border-t border-[#e9ecef] bg-white">
+        <div
+          id="mobile-nav-menu"
+          className={`md:hidden border-t border-[#e9ecef] bg-white transition-all duration-200 ${
+            mobileMenuOpen ? "block" : "hidden"
+          }`}
+        >
           <div className="py-2 space-y-1">
             {navItems.map((item) => (
               <button
                 key={item.key}
-                onClick={() => onNavigate(item.key)}
+                onClick={() => handleMobileNavigate(item.key)}
                 className={`flex w-full items-center gap-2 text-left px-3 py-2 text-sm font-medium rounded-md transition-all ${
                   currentPage === item.key
                     ? "bg-orange-50 text-orange-600 border-l-4 border-orange-500"
@@ -367,7 +388,10 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
                 Logout
               </button>
               <button
-                onClick={() => setShowPicker(true)}
+                onClick={() => {
+                  setShowPicker(true);
+                  setMobileMenuOpen(false);
+                }}
                 className="block w-full text-left px-3 py-2 text-sm font-medium bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-md mt-1"
               >
                 Create Job

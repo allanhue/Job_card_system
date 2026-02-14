@@ -72,7 +72,17 @@ export default function WorkdriveInvoicePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildPayload(false)),
       });
-      if (!res.ok) throw new Error("Failed to run check");
+      if (!res.ok) {
+        let detail = "Failed to run check";
+        try {
+          const data = await res.json();
+          detail = data?.detail || detail;
+        } catch {
+          const text = await res.text();
+          if (text) detail = text;
+        }
+        throw new Error(detail);
+      }
       const data = (await res.json()) as CheckResponse;
       setResult(data);
     } catch (err) {
@@ -95,7 +105,17 @@ export default function WorkdriveInvoicePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildPayload(true)),
       });
-      if (!res.ok) throw new Error("Failed to send email");
+      if (!res.ok) {
+        let detail = "Failed to send email";
+        try {
+          const data = await res.json();
+          detail = data?.detail || detail;
+        } catch {
+          const text = await res.text();
+          if (text) detail = text;
+        }
+        throw new Error(detail);
+      }
       const data = (await res.json()) as CheckResponse;
       setResult(data);
     } catch (err) {

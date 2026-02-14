@@ -401,3 +401,4 @@ def mark_invoice_paid(
     db.refresh(invoice)
     
     return {"message": "Invoice marked as paid", "invoice": invoice}
+ 

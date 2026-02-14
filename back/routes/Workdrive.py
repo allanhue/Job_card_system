@@ -64,8 +64,42 @@ ZOHO_BOOKS_2_CONFIG = {
 SCANNED_FOLDER_ID = os.getenv("ZOHO_WORDRIVE_SCANNED_FOLDER_ID", "0mqdi73cabe780dcf49adb599e8e650cf893e")
 
 
+def _missing_config(config: dict, keys: list[str]) -> list[str]:
+    missing: list[str] = []
+    for key in keys:
+        if not config.get(key):
+            missing.append(key)
+    return missing
 
-def get_new_access_token(config: dict, manager: TokenManager) -> str:
+
+def ensure_zoho_config() -> None:
+    missing_books = _missing_config(
+        ZOHO_BOOKS_2_CONFIG,
+        ["client_id", "client_secret", "refresh_token", "organization_id"],
+    )
+    missing_workdrive = _missing_config(
+        ZOHO_WORDRIVE_CONFIG,
+        ["client_id", "client_secret", "refresh_token", "organization_id"],
+    )
+    if not SCANNED_FOLDER_ID:
+        missing_workdrive.append("scanned_folder_id")
+    if missing_books or missing_workdrive:
+        detail_parts = []
+        if missing_books:
+            detail_parts.append(f"ZOHO_BOOKS config missing: {', '.join(missing_books)}")
+        if missing_workdrive:
+            detail_parts.append(f"ZOHO_WORKDRIVE config missing: {', '.join(missing_workdrive)}")
+        raise HTTPException(status_code=500, detail="; ".join(detail_parts))
+
+
+
+def get_new_access_token(config: dict, manager: TokenManager, service: str) -> str:
+    missing = _missing_config(config, ["client_id", "client_secret", "refresh_token"])
+    if missing:
+        raise HTTPException(
+            status_code=500,
+            detail=f"{service} OAuth config missing: {', '.join(missing)}",
+        )
     url = "https://accounts.zoho.com/oauth/v2/token"
     params = {
         "client_id": config.get("client_id"),
@@ -75,7 +109,12 @@ def get_new_access_token(config: dict, manager: TokenManager) -> str:
     }
     try:
         response = requests.post(url, params=params, timeout=10)
-        response.raise_for_status()
+        if not response.ok:
+            logger.error("%s token error %s: %s", service, response.status_code, response.text)
+            raise HTTPException(
+                status_code=500,
+                detail=f"{service} token error: {response.status_code} {response.text}",
+            )
         data = response.json()
         access_token = data.get("access_token")
         if not access_token:
@@ -88,10 +127,10 @@ def get_new_access_token(config: dict, manager: TokenManager) -> str:
         raise HTTPException(status_code=500, detail=f"Token request failed: {str(e)}")
 
 
-def get_valid_access_token(config: dict, manager: TokenManager) -> str:
+def get_valid_access_token(config: dict, manager: TokenManager, service: str) -> str:
     if manager.is_token_valid():
         return manager.access_token
-    return get_new_access_token(config, manager)
+    return get_new_access_token(config, manager, service)
 
 
 def normalize_currency(selected_currency: Optional[str]) -> str:
@@ -106,7 +145,7 @@ def normalize_currency(selected_currency: Optional[str]) -> str:
 
 
 def fetch_books_invoices(currency_code: str, date_from: Optional[str], date_to: Optional[str]) -> list:
-    access_token = get_valid_access_token(ZOHO_BOOKS_2_CONFIG, books2_token_manager)
+    access_token = get_valid_access_token(ZOHO_BOOKS_2_CONFIG, books2_token_manager, "Zoho Books")
     headers = {"Authorization": f"Zoho-oauthtoken {access_token}"}
     params = {"organization_id": ZOHO_BOOKS_2_CONFIG.get("organization_id")}
     if currency_code:
@@ -124,7 +163,7 @@ def fetch_books_invoices(currency_code: str, date_from: Optional[str], date_to: 
             timeout=30,
         )
         if response.status_code == 401:
-            access_token = get_new_access_token(ZOHO_BOOKS_2_CONFIG, books2_token_manager)
+            access_token = get_new_access_token(ZOHO_BOOKS_2_CONFIG, books2_token_manager, "Zoho Books")
             headers["Authorization"] = f"Zoho-oauthtoken {access_token}"
             response = requests.get(
                 "https://www.zohoapis.com/books/v3/invoices",
@@ -153,7 +192,7 @@ def fetch_books_invoices(currency_code: str, date_from: Optional[str], date_to: 
 
 
 def fetch_workdrive_invoice_numbers(folder_id: str) -> list:
-    access_token = get_valid_access_token(ZOHO_WORDRIVE_CONFIG, wordrive_token_manager)
+    access_token = get_valid_access_token(ZOHO_WORDRIVE_CONFIG, wordrive_token_manager, "Zoho WorkDrive")
     headers = {
         "Accept": "application/vnd.api+json",
         "Authorization": f"Zoho-oauthtoken {access_token}",
@@ -163,7 +202,7 @@ def fetch_workdrive_invoice_numbers(folder_id: str) -> list:
     try:
         folder_response = requests.get(folder_info_url, headers=headers, timeout=20)
         if folder_response.status_code == 401:
-            access_token = get_new_access_token(ZOHO_WORDRIVE_CONFIG, wordrive_token_manager)
+            access_token = get_new_access_token(ZOHO_WORDRIVE_CONFIG, wordrive_token_manager, "Zoho WorkDrive")
             headers["Authorization"] = f"Zoho-oauthtoken {access_token}"
             folder_response = requests.get(folder_info_url, headers=headers, timeout=20)
         try:
@@ -231,6 +270,7 @@ def fetch_workdrive_invoice_numbers(folder_id: str) -> list:
 
 @router.post("/check-invoices")
 async def check_invoices(payload: WorkdriveCheckRequest):
+    ensure_zoho_config()
     selected_currency = payload.currency or ""
     selected_statuses = payload.statuses or []
     recipient_email = (payload.email or "").strip()
