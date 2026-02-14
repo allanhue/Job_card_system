@@ -7,7 +7,7 @@ import asyncio
 import logging
 from datetime import datetime
 from routes import zoho_books, auth, invoices, job_card, send_mail, Workdrive, notifications
-from db import SessionLocal
+from db import SessionLocal, Base, engine
 from routes.notifications import cleanup_old_notifications
 
 app = FastAPI(title="Job Card API")
@@ -59,6 +59,10 @@ async def notification_cleanup_loop() -> None:
 
 @app.on_event("startup")
 async def startup_tasks():
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception:
+        logger.exception("Database initialization failed")
     asyncio.create_task(notification_cleanup_loop())
 
 @app.get("/")

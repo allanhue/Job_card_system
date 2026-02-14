@@ -355,7 +355,7 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
                 onClick={() => handleMobileNavigate(item.key)}
                 className={`flex w-full items-center gap-2 text-left px-3 py-2 text-sm font-medium rounded-md transition-all ${
                   currentPage === item.key
-                    ? "bg-orange-50 text-orange-600 border-l-4 border-orange-500"
+                    ? "bg-orange-50 text-orange-600"
                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 }`}
               >

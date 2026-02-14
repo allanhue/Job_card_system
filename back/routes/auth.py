@@ -191,9 +191,6 @@ class Notification(Base):
     read_at = Column(DateTime, nullable=True)
 
 
-Base.metadata.create_all(bind=engine)
-
-
 #  Utility functions 
 def get_password_hash(password):
     # Ensure password is not longer than 72 characters for bcrypt
