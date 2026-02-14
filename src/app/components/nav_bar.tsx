@@ -30,10 +30,51 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
   
   const navItems = [
     ...(user?.is_admin ? [{ name: "Dashboard", key: "home" }] : []),
-    { name: "Invoices", key: "invoices" },
-    ...(user?.is_admin ? [{ name: "WorkDrive", key: "workdrive", icon: "folder" }] : []),
-    { name: "Profile", key: "profile" },
+    { name: "Invoices", key: "invoices", icon: "invoice" },
+    ...(user?.is_admin ? [{ name: "WorkDrive", key: "workdrive", icon: "workdrive" }] : []),
+    { name: "Profile", key: "profile", icon: "profile" },
   ];
+
+  const renderNavIcon = (icon?: string) => {
+    if (!icon) return null;
+    if (icon === "invoice") {
+      return (
+        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M8 7h8M8 11h8M8 15h5M6 3h8l4 4v14l-3-2-3 2-3-2-3 2V3z"
+          />
+        </svg>
+      );
+    }
+    if (icon === "workdrive") {
+      return (
+        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M4 15a4 4 0 014-4h1.5a4.5 4.5 0 018.5 1.5H19a3 3 0 110 6H8a4 4 0 01-4-4z"
+          />
+        </svg>
+      );
+    }
+    if (icon === "profile") {
+      return (
+        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 12a4 4 0 100-8 4 4 0 000 8zm0 3c-4 0-7 2-7 4v1h14v-1c0-2-3-4-7-4z"
+          />
+        </svg>
+      );
+    }
+    return null;
+  };
 
   const handleLogout = () => {
     logout();
@@ -203,7 +244,7 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  d="M12 4a8 8 0 018 8v6l-2-1-2 1-2-1-2 1-2-1-2 1-2-1-2 1v-6a8 8 0 018-8z"
                 />
               </svg>
             </div>
@@ -227,21 +268,7 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
                     : "text-[var(--foreground-muted)] hover:text-[var(--accent-primary)] hover:bg-gray-50"
                 }`}
               >
-                {item.icon === "folder" && (
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M3 7a2 2 0 012-2h5l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"
-                    />
-                  </svg>
-                )}
+                {renderNavIcon(item.icon)}
                 {item.name}
                 {currentPage === item.key && (
                   <span className="absolute bottom-0 left-0 right-0 mx-auto h-0.5 w-3/4 rounded-full bg-gradient-to-r from-[var(--accent-primary)] to-[var(--accent-secondary)]" />
@@ -359,21 +386,7 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 }`}
               >
-                {item.icon === "folder" && (
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M3 7a2 2 0 012-2h5l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"
-                    />
-                  </svg>
-                )}
+                {renderNavIcon(item.icon)}
                 {item.name}
               </button>
             ))}
