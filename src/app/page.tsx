@@ -16,14 +16,7 @@ const WorkdriveInvoice = dynamic(() => import("./pages/workdrive_invoice"), { ss
 
 export default function Page() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600 gap-3">
-          <LoadingSpinner size={28} />
-          Loading...
-        </div>
-      }
-    >
+    <Suspense fallback={<Login />}>
       <PageContent />
     </Suspense>
   );
@@ -80,7 +73,9 @@ function PageContent() {
     [router]
   );
 
-  if (loading) {
+  const hasToken = typeof window !== "undefined" && !!localStorage.getItem("token");
+
+  if (loading && hasToken) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600 gap-3">
         <LoadingSpinner size={28} />

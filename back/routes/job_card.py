@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from datetime import datetime
 from pydantic import BaseModel
 
@@ -111,6 +112,7 @@ def _save_uploads(
 @router.post("/invoice/{invoice_id}", response_model=JobCardResponse)
 async def create_job_card(
     invoice_id: int,
+    background_tasks: BackgroundTasks,
     email: str | None = Form(None),
     status: str | None = Form(None),
     notes: str | None = Form(None),
@@ -137,6 +139,46 @@ async def create_job_card(
 
     if not invoice and not zoho_invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
+
+    # JobCard.invoice_id points to invoices.id, so map Zoho invoices to a local proxy invoice when needed.
+    if not invoice and zoho_invoice:
+        invoice = db.query(Invoice).filter(
+            Invoice.invoice_number == zoho_invoice.invoice_number,
+            Invoice.created_by == current_user.id,
+        ).first()
+        if not invoice:
+            candidate_number = zoho_invoice.invoice_number
+            if db.query(Invoice).filter(Invoice.invoice_number == candidate_number).first():
+                candidate_number = f"{zoho_invoice.invoice_number}-ZOHO-{zoho_invoice.id}"
+            invoice = Invoice(
+                invoice_number=candidate_number,
+                client_name=zoho_invoice.client_name,
+                client_email=zoho_invoice.client_email,
+                client_address=zoho_invoice.client_address,
+                client_phone=zoho_invoice.client_phone,
+                title=zoho_invoice.title or "Zoho Invoice",
+                description=zoho_invoice.description,
+                amount=zoho_invoice.amount,
+                tax_rate=zoho_invoice.tax_rate or 0.0,
+                total_amount=zoho_invoice.total_amount,
+                status=zoho_invoice.status or "pending",
+                issue_date=zoho_invoice.issue_date,
+                due_date=zoho_invoice.due_date,
+                paid_date=zoho_invoice.paid_date,
+                created_by=current_user.id,
+            )
+            try:
+                db.add(invoice)
+                db.commit()
+                db.refresh(invoice)
+            except IntegrityError:
+                db.rollback()
+                invoice = db.query(Invoice).filter(
+                    Invoice.invoice_number == candidate_number,
+                    Invoice.created_by == current_user.id,
+                ).first()
+            if not invoice:
+                raise HTTPException(status_code=500, detail="Failed to map Zoho invoice to local invoice")
 
     selected_items_parsed = json.loads(selected_items) if selected_items else []
     work_logs_parsed = json.loads(work_logs) if work_logs else []
@@ -186,7 +228,7 @@ async def create_job_card(
 
     job_card = JobCard(
         job_card_number=job_card_number,
-        invoice_id=invoice.id if invoice else zoho_invoice.id,
+        invoice_id=invoice.id,
         invoice_number=invoice_number,
         client_name=client_name,
         email=email,
@@ -244,22 +286,26 @@ async def create_job_card(
                 f"<p><strong>Status:</strong> {job_card.status}</p>"
                 f"{attachment_lines}{voice_line}"
             )
-            await send_email([email], subject, body)
-        except Exception as e:
+            if background_tasks:
+                background_tasks.add_task(send_email, [email], subject, body)
+            else:
+                await send_email([email], subject, body)
+        except Exception:
             logger.exception("Failed to send job card email")
 
     sms_phone = None
     if invoice and invoice.client_phone:
         sms_phone = invoice.client_phone
-    elif zoho_invoice and zoho_invoice.client_phone:
-        sms_phone = zoho_invoice.client_phone
     elif assigned_user and assigned_user.phone:
         sms_phone = assigned_user.phone
 
     if sms_phone and (notify_email is None or notify_email):
         try:
             text = f"Job card {job_card.job_card_number} created for invoice {job_card.invoice_number}."
-            await send_sms(sms_phone, text, tag="job-card")
+            if background_tasks:
+                background_tasks.add_task(send_sms, sms_phone, text, "job-card")
+            else:
+                await send_sms(sms_phone, text, tag="job-card")
         except Exception:
             logger.exception("Failed to send job card SMS")
 

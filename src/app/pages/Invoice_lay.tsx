@@ -62,6 +62,11 @@ export default function JobCardModal({
   };
 
   const handleSubmit = async () => {
+    if (!email || !jobDescription || !assignedUserId) {
+      pushToast("error", "Email, job description, and assigned user are required.");
+      return;
+    }
+
     setSubmitting(true);
     try {
       const token = localStorage.getItem("token");
@@ -122,7 +127,15 @@ export default function JobCardModal({
         body: formData,
       });
 
-      if (!res.ok) throw new Error("Failed to submit job card");
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        const detail =
+          payload?.detail ||
+          payload?.message ||
+          payload?.error ||
+          `Failed to submit job card (${res.status})`;
+        throw new Error(detail);
+      }
       pushToast("success", "Job card submitted successfully.");
       setJobDescription("");
       setAdditionalNotes("");

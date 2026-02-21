@@ -29,9 +29,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const token = localStorage.getItem("token");
       if (!token) return false;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 6000);
       const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
-      });
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timeout));
       if (!res.ok) {
         if (strict && (res.status === 401 || res.status === 403)) {
           clearAuth();
