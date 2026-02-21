@@ -62,8 +62,8 @@ export default function JobCardModal({
   };
 
   const handleSubmit = async () => {
-    if (!email || !jobDescription || !assignedUserId) {
-      pushToast("error", "Email, job description, and assigned user are required.");
+    if (!email) {
+      pushToast("error", "Email is required.");
       return;
     }
 
@@ -212,11 +212,8 @@ export default function JobCardModal({
             
             {/* Job Description */}
             <div className="mt-4 pt-4 border-t border-gray-200">
-              <label className="block text-sm font-medium text-gray-900 mb-2">
-                Job Description <span className="text-red-500">*</span>
-              </label>
+              <label className="block text-sm font-medium text-gray-900 mb-2">Job Description</label>
               <textarea
-                required
                 rows={3}
                 value={jobDescription}
                 onChange={(e) => setJobDescription(e.target.value)}
@@ -401,9 +398,7 @@ export default function JobCardModal({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">
-                Who Did the Job <span className="text-red-500">*</span>
-              </label>
+              <label className="block text-sm font-medium text-gray-900 mb-2">Who Did the Job</label>
               <input
                 type="text"
                 placeholder="Search user..."
@@ -412,7 +407,6 @@ export default function JobCardModal({
                 className="mb-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-orange-500 focus:outline-none"
               />
               <select
-                required
                 value={assignedUserId}
                 onChange={(e) => setAssignedUserId(e.target.value)}
                 onFocus={() => {
